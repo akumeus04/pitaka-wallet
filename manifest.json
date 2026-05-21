@@ -1,7 +1,7 @@
 {
-  "name": "Pitaka Wallet Dashboard",
+  "name": "Pitaka Wallet Mobile",
   "short_name": "Pitaka",
-  "start_url": "./index-mobile.html",
+  "start_url": "./mobile.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
