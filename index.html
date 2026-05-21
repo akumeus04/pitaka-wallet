@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Wallet na 💳 Pitaka</title>
+  
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    /* =====================================================
+       PITAKA WALLET — FINANCIAL DASHBOARD REDESIGN
+       Clean banking aesthetic: numbers-first, trustworthy
+       Refined dark-on-light with teal/emerald financial tone
+    ===================================================== */
+
+    @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      /* Core palette — financial teal + deep navy */
+      --primary: #0d9488;       /* teal-600 */
+      --primary-hover: #0f766e; /* teal-700 */
+      --primary-light: rgba(13,148,136,0.1);
+      --primary-glow: rgba(13,148,136,0.25);
+
+      /* Surfaces */
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --text: #0f2027;
+      --text-2: #475569;
+      --text-3: #94a3b8;
+
+      /* Borders */
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      /* Status */
+      --success: #059669;
+      --success-bg: #ecfdf5;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --warning: #d97706;
+      --warning-bg: #fffbeb;
+      --info: #0284c7;
+      --info-bg: #eff6ff;
+
+      /* Spacing & Shape */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
+
+      /* Typography */
+      --font-body: 'Sora', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0; padding: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── LOGIN SCREEN ── */
+    #loginScreen {
+      width: 90%;
+      max-width: 360px;
+      padding: 36px 28px;
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
+      box-sizing: border-box;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #loginScreen h2 {
+      text-align: center;
+      color: var(--primary);
+      margin: 0 0 24px 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* ── APP LAYOUT ── */
+    .app-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 12px 12px 20px 88px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 10px;
+    }
+
+    header h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    /* ── NAVIGATION ── */
+    nav {
+      display: flex;
+      gap: 4px;
+      background: var(--card);
+      padding: 5px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+
+    nav::-webkit-scrollbar { display: none; }
+
+    nav button {
+      background: none;
+      border: none;
+      padding: 7px 13px;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-2);
+      cursor: pointer;
+      border-radius: 7px;
+      white-space: nowrap;
+      font-family: var(--font-body);
+      transition: all 0.15s ease;
+      letter-spacing: 0.01em;
+    }
+
+    nav button:hover { background: var(--bg); color: var(--text); }
+
+    nav button.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 8px rgba(13,148,136,0.3);
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    /* ── FORMS ── */
+    .grid-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-group { display: flex; flex-direction: column; }
+    .form-group.full-width { grid-column: span 2; }
+
+    label {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input, select, textarea {
+      padding: 9px 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-family: var(--font-body);
+      color: var(--text);
+      background: #f8fafc;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      background: white;
+    }
+
+    input[type="date"], input[type="month"] {
+      color-scheme: light;
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 4px;
+      font-size: 12px;
+      font-family: var(--font-body);
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(13,148,136,0.2);
+      letter-spacing: 0.01em;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 3px 8px rgba(13,148,136,0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn.btn-edit {
+      background: var(--warning-bg);
+      color: var(--warning);
+      border: 1px solid rgba(217,119,6,0.25);
+      padding: 6px 11px;
+      margin: 0;
+      font-size: 11px;
+      width: auto;
+      box-shadow: none;
+    }
+
+    .btn.btn-edit:hover:not(:disabled) {
+      background: #fef3c7;
+      transform: translateY(-1px);
+    }
+
+    .btn.btn-cancel { background: var(--danger); box-shadow: 0 1px 3px rgba(220,38,38,0.2); }
+    .btn.btn-cancel:hover:not(:disabled) { background: #b91c1c; }
+
+    .btn:disabled {
+      background: var(--border);
+      color: var(--text-3);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(220,38,38,0.3);
+      color: var(--danger);
+      width: auto;
+      padding: 7px 14px;
+      font-size: 12px;
+      margin: 0;
+      font-weight: 600;
+      box-shadow: none;
+    }
+
+    .btn-logout:hover:not(:disabled) {
+      background: var(--danger-bg);
+      border-color: var(--danger);
+      box-shadow: none;
+    }
+
+    /* ── TABLES ── */
+    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-md); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 9px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg);
+      font-weight: 700;
+      color: var(--text-2);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    td { white-space: nowrap; }
+
+    tr:hover td { background: #f8fafc; }
+
+    /* Number cells use mono font */
+    td:has(strong) strong[style*="color: var(--success)"],
+    td[style*="color: var(--success)"],
+    td[style*="color: var(--danger)"] {
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .badge.Pending { background: var(--warning-bg); color: var(--warning); border: 1px solid rgba(217,119,6,0.2); }
+    .badge.In-Process { background: var(--info-bg); color: var(--info); border: 1px solid rgba(2,132,199,0.2); }
+    .badge.Paid { background: var(--success-bg); color: var(--success); border: 1px solid rgba(5,150,105,0.2); }
+    .badge.Cancelled { background: #f1f5f9; color: var(--text-3); border: 1px solid var(--border); }
+
+    /* ── SEARCH BOX ── */
+    .search-box {
+      width: 100%;
+      padding: 9px 13px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-family: var(--font-body);
+      margin-bottom: 12px;
+      box-sizing: border-box;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .search-box:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+      background: white;
+    }
+
+    /* ── CURRENCY BOX ── */
+    .currency-box {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      grid-column: span 2;
+      border: 1px solid var(--border-strong);
+    }
+
+    .currency-box div { flex: 1; }
+
+    .exchange-note {
+      grid-column: span 2;
+      font-size: 11px;
+      color: var(--text-3);
+      text-align: center;
+      margin-top: -4px;
+      font-family: var(--font-mono);
+    }
+
+    /* ── MONTH BROWSER ── */
+    .month-browser {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      background: var(--card);
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+
+    .month-browser button {
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-2);
+      font-family: var(--font-body);
+      transition: all 0.15s;
+    }
+
+    .month-browser button:hover { background: #e2e8f0; color: var(--text); }
+
+    .month-display {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+      min-width: 130px;
+      text-align: center;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── MODALS ── */
+    .modal {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(15,32,39,0.55);
+      backdrop-filter: blur(4px);
+      display: flex; justify-content: center; align-items: flex-end;
+      z-index: 10000;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .modal-content {
+      background: var(--card);
+      width: 100%;
+      max-width: 500px;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 24px 20px 28px;
+      position: relative;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+      border-top: 1px solid var(--border);
+      animation: slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    /* Pull-tab handle on modal */
+    .modal-content::before {
+      content: '';
+      display: block;
+      width: 40px;
+      height: 4px;
+      background: var(--border-strong);
+      border-radius: 2px;
+      margin: 0 auto 18px;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-content h3 {
+      margin: 0 0 16px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .close-btn, .close {
+      position: absolute;
+      top: 20px; right: 18px;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--text-3);
+      font-weight: bold;
+      line-height: 1;
+      transition: color 0.15s;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: var(--bg);
+    }
+
+    .close-btn:hover, .close:hover { color: var(--danger); background: var(--danger-bg); }
+
+    /* Desktop modals centered */
+    @media (min-width: 600px) {
+      .modal { align-items: center; padding: 16px; }
+      .modal-content {
+        border-radius: var(--radius-lg);
+        animation: fadeScale 0.22s ease;
+      }
+      .modal-content::before { display: none; }
+      @keyframes fadeScale {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+    }
+
+    /* ── LEDGER HEADER ── */
+    .ledger-header {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: stretch;
+    }
+
+    .ledger-header h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .header-actions button {
+      flex: 1;
+      min-width: 80px;
+      margin: 0;
+      font-size: 11px;
+      padding: 8px 6px;
+    }
+
+    /* ── LEFT PANE (FLOATING SIDEBAR) ── */
+    .left-pane {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 72px;
+      padding: 16px 0 16px 12px; z-index: 9999;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 0;
+    }
+
+    .left-pane > * { pointer-events: auto; }
+
+    .left-pane-top {
+      display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+    }
+
+    .left-pane-bottom {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 12px; align-items: flex-start;
+    }
+
+    /* ── FLOATING ALERTS ── */
+    .floating-alert {
+      position: relative;
+      background: var(--danger);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      height: 36px;
+      max-width: 36px;
+      padding: 0;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(220,38,38,0.35);
+      animation: pulse 2s infinite;
+      display: flex;
+      align-items: center;
+      transition: max-width 0.4s cubic-bezier(0.25,0.8,0.25,1), padding 0.4s ease;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .floating-alert:hover { max-width: 250px; padding: 0 15px; }
+    .floating-alert.warning { background: #f97316; animation: none; box-shadow: 0 4px 10px rgba(249,115,22,0.35); }
+
+    .alert-icon { font-weight: bold; font-size: 14px; min-width: 36px; text-align: center; }
+    .alert-text { margin-left: 5px; opacity: 0; transition: opacity 0.3s 0.1s ease; font-size: 12px; color: white; }
+    .floating-alert:hover .alert-text { opacity: 1; }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
+      100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    }
+
+    /* ── SYNC + ICON BUTTONS ── */
+    .sync-icon { display: inline-block; }
+    .spinning { animation: smooth-spin 0.9s linear infinite; }
+    @keyframes smooth-spin { 100% { transform: rotate(360deg); } }
+
+    .floating-action-container { display: flex; flex-direction: column; gap: 10px; }
+
+    .icon-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: none;
+      color: white;
+      font-size: 15px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+
+    .icon-btn:hover { transform: scale(1.12); box-shadow: var(--shadow-lg); }
+    .icon-btn.calc-btn { background: #7c3aed; }
+    .icon-btn.sync-btn { background: var(--success); }
+    .calendar-btn { background: #db2777; }
+
+    /* ── PAYDAY WIDGET ── */
+    .payday-widget {
+      position: relative;
+      background: var(--card);
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      border-radius: 25px;
+      height: 36px;
+      max-width: 36px;
+      padding: 0;
+      display: flex; align-items: center;
+      box-shadow: var(--shadow-sm);
+      cursor: default;
+      overflow: hidden; white-space: nowrap;
+      transition: max-width 0.4s cubic-bezier(0.25,0.8,0.25,1), padding 0.4s, background 0.3s, border-color 0.3s;
+    }
+
+    .payday-widget:hover { max-width: 250px; padding: 0 15px; box-shadow: var(--shadow-md); }
+    .payday-icon { font-weight: bold; font-size: 14px; min-width: 32px; text-align: center; }
+    .payday-details { margin-left: 5px; opacity: 0; transition: opacity 0.3s 0.1s ease; font-size: 12px; color: var(--text-2); font-weight: 600; }
+    .payday-widget:hover .payday-details { opacity: 1; }
+
+    .payday-widget.is-payday {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+      max-width: 250px;
+      padding: 0 15px;
+      animation: bounce 1s ease 3;
+    }
+
+    .payday-widget.is-payday .payday-details { opacity: 1; color: white; }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+    /* ── SUB-HEADER GREETING ── */
+    .sub-greeting {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 500;
+    }
+
+    /* ── GLOBAL STATUS LINE ── */
+    #globalStatus {
+      text-align: center;
+      padding: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    /* ── CALENDAR WIDGET ── */
+    .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; text-align: center; margin-top: 10px; }
+    .cal-header { font-weight: 700; font-size: 10px; padding: 5px 0; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+    .cal-header.sunday { color: var(--danger); }
+    .cal-day {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 2px;
+      font-size: 11px;
+      cursor: pointer;
+      min-height: 42px;
+      display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+      position: relative;
+      background: var(--card);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .cal-day:hover { transform: scale(1.06); box-shadow: var(--shadow-md); z-index: 10; border-color: var(--primary); }
+    .cal-day.empty { background: transparent; border: none; cursor: default; }
+    .cal-day.empty:hover { transform: none; box-shadow: none; }
+    .cal-day.sunday-text { color: var(--danger); font-weight: 600; }
+    .cal-day.weekend { background: #f8fafc; color: var(--text-3); }
+    .cal-day.ph-holiday { background: #fef9c3 !important; color: #854d0e; border-color: #fde047; }
+    .cal-day.sa-holiday { background: #ffedd5 !important; color: #9a3412; border-color: #fdba74; }
+    .cal-day.both-holiday { background: linear-gradient(135deg, #fef9c3 50%, #ffedd5 50%) !important; color: #000; border-color: #fb923c; }
+    .cal-day.today { border: 2px solid var(--primary); font-weight: 700; }
+    .cal-indicator { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); margin-top: 4px; display: none; }
+    .event-log-item { background: #f8fafc; padding: 8px; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); margin-bottom: 5px; font-size: 12px; text-align: left; }
+    .event-log-item.ph { border-left-color: #eab308; }
+    .event-log-item.sa { border-left-color: #f97316; }
+    .cal-day.has-personal { background: #fdf4ff !important; border-color: #e879f9; }
+    .cal-day.has-personal:not(.ph-holiday):not(.sa-holiday):not(.both-holiday) { color: #a21caf; }
+
+    /* ── RESPONSIVE BREAKPOINTS ── */
+    @media (min-width: 600px) {
+      .grid-form { grid-template-columns: 1fr 1fr; }
+      .ledger-header { flex-direction: row; align-items: center; justify-content: space-between; }
+      .header-actions { width: auto; flex-wrap: nowrap; }
+      .header-actions button { width: auto; flex: none; padding: 8px 14px; }
+    }
+
+    @media (max-width: 599px) {
+      .app-container { padding: 10px 10px 24px 72px; }
+      .grid-form { grid-template-columns: 1fr; }
+      .form-group.full-width { grid-column: span 1; }
+      .currency-box { grid-column: span 1; flex-direction: column; }
+      .currency-box div[style*="flex: 0"] { display: none; }
+      .header-actions button { font-size: 11px; padding: 8px 6px; }
+      nav button { padding: 7px 10px; font-size: 11px; }
+      header h2 { font-size: 14px; }
+      .card { padding: 12px; }
+      th, td { padding: 7px 8px; }
+      .left-pane { width: 58px; padding-left: 10px; }
+    }
+
+    @media (max-width: 380px) {
+      .app-container { padding: 8px 8px 20px 62px; }
+      .left-pane { width: 52px; padding-left: 8px; }
+      nav button { padding: 6px 8px; font-size: 10px; }
+    }
+
+    /* ── PRIVACY MODE: GOOGLE SCREEN ── */
+    body.privacy-locked { background-color: #202124 !important; overflow: hidden; }
+    body.privacy-locked #appScreen,
+    body.privacy-locked .left-pane,
+    body.privacy-locked #loginScreen { display: none !important; }
+
+    #fakeGoogleScreen {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: #202124;
+      z-index: 999999;
+      flex-direction: column; align-items: center; justify-content: center;
+      font-family: Arial, sans-serif;
+    }
+
+    body.privacy-locked #fakeGoogleScreen { display: flex; }
+    .google-logo { width: 272px; margin-bottom: 30px; }
+    .search-container { position: relative; width: 100%; max-width: 584px; }
+    .search-bar {
+      width: 100%; padding: 12px 20px 12px 45px;
+      background-color: #303134; border: 1px solid #5f6368; color: #e8eaed;
+      border-radius: 24px; font-size: 16px; outline: none; box-sizing: border-box;
+      transition: box-shadow 0.2s;
+    }
+    .search-bar:hover, .search-bar:focus { box-shadow: 0 1px 6px rgba(0,0,0,0.5); border-color: rgba(223,225,229,0); }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9aa0a6; width: 20px; height: 20px; }
+    .google-btns { margin-top: 28px; display: flex; gap: 12px; }
+    .google-btn { background-color: #303134; border: 1px solid #303134; color: #e8eaed; border-radius: 4px; font-size: 14px; padding: 0 16px; height: 36px; cursor: pointer; }
+    .google-btn:hover { box-shadow: 0 1px 1px rgba(0,0,0,.3); border: 1px solid #5f6368; color: #ffffff; }
+
+    /* ── PRIVACY MODE 2: IMAGE SCREEN ── */
+    body.image-locked { background-color: #000 !important; overflow: hidden; }
+    body.image-locked #appScreen, body.image-locked .left-pane,
+    body.image-locked #loginScreen, body.image-locked #fakeGoogleScreen { display: none !important; }
+    #fakeImageScreen {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: #000; z-index: 999999; align-items: center; justify-content: center;
+    }
+    body.image-locked #fakeImageScreen { display: flex; }
+    #dummyJpgTarget { max-width: 100vw; max-height: 100vh; object-fit: contain; }
+	
+/* ── NOTE BUBBLES ── */
+.note-bubble {
+  display: inline-block;
+  max-width: 140px; /* Adjust this to control how wide the column gets */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--bg);
+  padding: 4px 10px;
+  border-radius: 12px; /* Smooth, pill-like bubble */
+  border: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 11px;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.note-bubble:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.empty-note {
+  color: var(--text-3);
+  font-style: italic;
+  font-size: 11px;
+}
+
+    /* ── DARK MODE ── */
+    body.dark-theme {
+      --primary: #14b8a6;
+      --primary-hover: #0d9488;
+      --primary-light: rgba(20,184,166,0.1);
+      --primary-glow: rgba(20,184,166,0.2);
+      --bg: #0f1923;
+      --card: #162032;
+      --text: #f1f5f9;
+      --text-2: #94a3b8;
+      --text-3: #64748b;
+      --border: #1e3048;
+      --border-strong: #253d5a;
+      --success-bg: rgba(5,150,105,0.15);
+      --danger-bg: rgba(220,38,38,0.15);
+      --warning-bg: rgba(217,119,6,0.15);
+      --info-bg: rgba(2,132,199,0.15);
+    }
+
+    body.dark-theme label, body.dark-theme th,
+    body.dark-theme .exchange-note, body.dark-theme .sub-greeting,
+    body.dark-theme small, body.dark-theme .cal-header { color: var(--text-2) !important; }
+
+    body.dark-theme h3, body.dark-theme h2 { color: var(--text) !important; }
+
+    body.dark-theme input, body.dark-theme select, body.dark-theme textarea {
+      background-color: #0f1923 !important;
+      color: var(--text) !important;
+      border-color: var(--border-strong) !important;
+      color-scheme: dark;
+    }
+
+    body.dark-theme input:focus, body.dark-theme select:focus, body.dark-theme textarea:focus {
+      background-color: #162032 !important;
+    }
+
+    body.dark-theme input[readonly], body.dark-theme input:disabled {
+      background-color: var(--bg) !important;
+      color: var(--text-3) !important;
+    }
+
+    body.dark-theme .search-box,
+    body.dark-theme .currency-box,
+    body.dark-theme div[style*="background: #f0fdf4"],
+    body.dark-theme div[style*="background: #fef2f2"],
+    body.dark-theme div[style*="background:#f3f4f6"],
+    body.dark-theme div[style*="background: #f8fafc"],
+    body.dark-theme .ledger-header div[style*="background: var(--bg)"] {
+      background-color: var(--bg) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text) !important;
+    }
+
+    body.dark-theme #todoSummaryText,
+    body.dark-theme #sumSarTotal { color: #34d399 !important; }
+    body.dark-theme #sumPhpTotal { color: #f87171 !important; }
+
+    body.dark-theme .cal-day.weekend { background-color: rgba(255,255,255,0.03) !important; color: var(--text-3) !important; }
+    body.dark-theme .btn-edit { color: #0f172a !important; }
+
+    body.dark-theme .month-browser button {
+      color: var(--text) !important;
+      background-color: var(--bg) !important;
+      border-color: var(--border-strong) !important;
+    }
+
+    body.dark-theme .month-browser button:hover { background-color: #1e3048 !important; }
+
+    body.dark-theme #currentBrowserMonthDisplay {
+      color: var(--primary) !important;
+      background-color: transparent !important;
+      border: none !important;
+    }
+
+    body.dark-theme tr:hover td { background: rgba(255,255,255,0.03) !important; }
+
+    body.dark-theme tr[style*="#fef2f2"], body.dark-theme tr[style*="rgb(254, 242, 242)"] {
+      background-color: rgba(239,68,68,0.15) !important;
+    }
+    body.dark-theme tr[style*="#fff7ed"], body.dark-theme tr[style*="rgb(255, 247, 237)"] {
+      background-color: rgba(249,115,22,0.15) !important;
+    }
+    body.dark-theme tr[style*="background"] td,
+    body.dark-theme tr[style*="background"] td strong,
+    body.dark-theme tr[style*="background"] td small { color: #f1f5f9 !important; }
+
+    body.dark-theme .event-log-item { background-color: var(--bg) !important; color: var(--text) !important; border-color: var(--border-strong) !important; }
+    body.dark-theme .event-log-item.ph { border-left-color: #eab308 !important; }
+    body.dark-theme .event-log-item.sa { border-left-color: #f97316 !important; }
+    body.dark-theme .cal-day { background-color: var(--card) !important; color: var(--text) !important; border-color: var(--border) !important; }
+    body.dark-theme .cal-day.empty { background-color: transparent !important; border: none !important; }
+    body.dark-theme .cal-day.sunday-text, body.dark-theme .cal-header.sunday { color: #f87171 !important; }
+    body.dark-theme .cal-day.today { border-color: var(--primary) !important; }
+
+    body.dark-theme .cal-day.ph-holiday { background-color: rgba(253,224,71,0.12) !important; color: #fef08a !important; border-color: #854d0e !important; }
+    body.dark-theme .cal-day.sa-holiday { background-color: rgba(249,115,22,0.12) !important; color: #fed7aa !important; border-color: #c2410c !important; }
+    body.dark-theme .cal-day.both-holiday { background: linear-gradient(135deg,rgba(253,224,71,.12) 50%,rgba(249,115,22,.12) 50%) !important; color: #fde047 !important; border-color: #ea580c !important; }
+    body.dark-theme .cal-day.has-personal { background-color: rgba(232,121,249,0.12) !important; color: #f0abfc !important; border-color: #a21caf !important; }
+
+    body.dark-theme #dashboardTable tr[style*="background"] { background-color: rgba(20,184,166,0.12) !important; }
+    body.dark-theme #dashboardTable tr[style*="background"] td, body.dark-theme #dashboardTable tr[style*="background"] td strong { color: #f1f5f9 !important; }
+
+    body.dark-theme #budgetLimitInput { color: #f87171 !important; background: transparent !important; }
+
+    body.dark-theme table { color: var(--text); }
+    body.dark-theme #allowanceTableBody td { border-bottom: 1px solid var(--border) !important; }
+    body.dark-theme #allowanceTableBody td strong { color: #ffffff !important; }
+    body.dark-theme #allowanceTableBody td small { color: var(--text-2) !important; }
+    body.dark-theme .alw-breakdown-item { color: var(--text-2) !important; }
+
+    body.dark-theme .card { border-color: var(--border); }
+    body.dark-theme nav { border-color: var(--border); }
+    body.dark-theme .month-browser { border-color: var(--border); }
+    body.dark-theme .badge.Pending { background: rgba(217,119,6,0.18); color: #fbbf24; border-color: rgba(217,119,6,0.3); }
+    body.dark-theme .badge.In-Process { background: rgba(2,132,199,0.18); color: #38bdf8; border-color: rgba(2,132,199,0.3); }
+    body.dark-theme .badge.Paid { background: rgba(5,150,105,0.18); color: #34d399; border-color: rgba(5,150,105,0.3); }
+    body.dark-theme .badge.Cancelled { background: rgba(255,255,255,0.05); color: var(--text-3); border-color: var(--border); }
+
+    body.dark-theme .payday-widget { background: var(--card) !important; border-color: var(--primary) !important; }
+    body.dark-theme .payday-details { color: var(--text-2) !important; }
+
+    body.dark-theme .icon-btn[style*="background: var(--card)"] {
+      background: var(--card) !important;
+      border-color: var(--border-strong) !important;
+    }
+
+  </style>
+</head>
+<body>
+
+  <div id="loginScreen">
+    <h2 style="text-align:center; color: var(--primary); margin-top: 0;">Wallet 💳 Login</h2>
+    <form id="loginForm">
+      <div class="form-group" style="margin-bottom: 12px;"><label>Email</label><input type="email" id="loginEmail" required></div>
+      <div class="form-group"><label>Password</label><input type="password" id="loginPassword" required></div>
+      <button type="submit" class="btn" id="loginBtn">Sign In</button>
+    </form>
+    <div id="loginError" style="color: var(--danger); text-align: center; margin-top: 10px; font-size: 12px;"></div>
+  </div>
+
+  <div id="appScreen" class="app-container hidden">
+
+<div class="left-pane">
+      <div class="left-pane-top">
+<button id="themeToggleBtn" class="icon-btn" style="background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 36px; height: 36px; display: flex; justify-content: center; align-items: center;" title="Toggle Dark/Light Mode">
+  <span id="themeIcon" style="font-size: 16px;">🌙</span>
+</button>
+        
+        <button id="globalTodoRedBtn" class="floating-alert hidden" onclick="goToTodoView('red')"></button>
+        <button id="globalTodoOrangeBtn" class="floating-alert warning hidden" onclick="goToTodoView('orange')"></button>
+      </div>
+      <div class="left-pane-bottom" id="injectedWidgetsContainer">
+        </div>
+    </div>
+
+    <header>
+      <div style="display: flex; flex-direction: column;">
+        <h2>My Wallet na 💳 Pitaka</h2>
+        <div id="floatingGreeting" class="sub-greeting hidden">
+          <span id="greetingIcon" style="font-size: 13px;">👋</span>
+          <span id="greetingText">Welcome!</span>
+        </div>
+      </div>
+      <button id="logoutBtn" class="btn btn-logout">Log Out</button>
+    </header>
+
+    <nav>
+      <button class="nav-btn active" data-target="view-dashboard">Dashboard</button>
+      <button class="nav-btn" data-target="view-income">Income</button>
+      <button class="nav-btn" data-target="view-expenses">Expenses</button>
+      <button class="nav-btn" data-target="view-loans">Loans</button>
+      <button class="nav-btn" data-target="view-allowance">Allowances</button>
+      <button class="nav-btn" data-target="view-todo">📅 To-Dos</button>
+    </nav>
+
+    <div id="globalMonthBrowser" class="month-browser hidden">
+      <button id="prevMonthBtn">&lt; Prev</button>
+      <button id="currentBrowserMonthDisplay" class="month-display" style="background: none; border: none; cursor: pointer; padding: 0 10px;" title="Return to Current Month">Loading...</button>
+      <button id="nextMonthBtn">Next &gt;</button>
+    </div>
+
+    <div id="globalStatus" style="text-align: center; padding: 8px; font-weight: 500; font-size: 12px;"></div>
+
+<div id="view-dashboard" class="view-section">
+      <div class="card">
+        <div class="ledger-header" style="flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between;">
+          
+          <div style="display: flex; align-items: center; gap: 15px;">
+		  <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+             <h3 style="margin: 0;">12-Month Rolling Forecast (SAR)</h3>
+             
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);">           
+		
+  		    <span style="font-size: 14px;" title="Budget Alert Limit">🚩</span>
+            <label style="margin: 0; font-size: 11px; font-weight: 600; color: var(--text);">Limit:</label>
+            <input type="number" id="budgetLimitInput" value="5000" 
+                   style="width: 70px; border: none; background: transparent; font-weight: bold; color: var(--danger); outline: none; padding: 0;" 
+                   oninput="saveBudgetLimit()">
+            <span style="font-size: 10px; font-weight: bold; color: var(--text); opacity: 0.7;">SAR</span>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="dashboardTable">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Total Income</th>
+                <th>Active Expenses</th>
+                <th>Active Loans</th>
+                <th>Active Allowances</th>
+                <th>New Balance</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+<div id="view-income" class="view-section hidden">
+  <div class="card">
+    <div class="ledger-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+        <h3 style="margin: 0;">Income Ledger</h3>
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn" onclick="openCategoryOverview('income')" style="background: #0ea5e9;">📊 Overview</button>
+        <button class="btn" onclick="openNewIncModal()">+ Add Income</button>
+        <button class="btn" onclick="duplicateAllIncomeToNextMonth()" style="background: var(--warning); color: #000;">📑 Duplicate All</button>
+      </div>
+    </div>
+    
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Target Month</th>
+            <th>Description</th>
+            <th>Amount (SAR)</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="incomeTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="view-expenses" class="view-section hidden">
+  <div class="card">
+    <div class="ledger-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+        <h3 style="margin: 0;">Expense Ledger</h3>
+      </div>
+      
+<div class="header-actions">
+  <button class="btn" onclick="openBillsOverviewModal('expenses')" style="background: #8b5cf6;">🧾 Bills Overview</button>
+  
+  <button class="btn" onclick="openCategoryOverview('expenses')" style="background: #0ea5e9;">📊 Overview</button>
+  <button class="btn" onclick="openNewExpModal()">+ Add Expense</button>
+</div>
+    </div>
+    
+    <input type="text" id="searchExpenses" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderExpenseHistory()">
+    
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>SAR/Mo</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="expenseTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+	
+
+<div id="view-loans" class="view-section hidden">
+  <div class="card">
+    <div class="ledger-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+        <h3 style="margin: 0;">Loan Ledger</h3>
+      </div>
+<div class="header-actions">
+  <button class="btn" onclick="openBillsOverviewModal('loans')" style="background: #8b5cf6;">🧾 Bills Overview</button>
+  
+  <button class="btn" onclick="openCategoryOverview('loans')" style="background: #0ea5e9;">📊 Overview</button>
+  <button class="btn" onclick="openNewLoanModal()">+ Add Loan</button>
+</div>
+    </div>
+    <input type="text" id="searchLoans" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderLoanHistory()">
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Description</th><th>SAR/Mo</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead>
+        <tbody id="loanTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<div id="view-allowance" class="view-section hidden">
+  <div class="card">
+    <div class="ledger-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+        <h3 style="margin: 0;">Allowance Ledger</h3>
+      </div>
+      <div class="header-actions">
+        <button class="btn" onclick="openCategoryOverview('allowances')" style="background: #0ea5e9;">📊 Overview</button>
+        <button class="btn" onclick="openNewAlwModal()">+ Add Allowance</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Student</th><th>Duration & Days</th><th>Total (PHP)</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="allowanceTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="view-todo" class="view-section hidden">
+  <div class="card">
+    <div class="ledger-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+        <h3 style="margin: 0;">Recurring Bills & To-Dos</h3>
+      </div>
+      <div class="header-actions">
+        <button class="btn" onclick="openCategoryOverview('todos')" style="background: #0ea5e9;">📊 Overview</button>
+        <button class="btn" onclick="openNewTodoModal()">+ Add Entry</button>
+      </div>
+    </div>
+    <div id="todoAlertsContainer"></div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Current Due Date</th>
+            <th>Amount</th>
+            <th>Status / Alert</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="todoTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+    <div id="incomeModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn" onclick="cancelIncEdit()">&times;</span>
+        <h3 id="incFormTitle" style="margin-top:0;">Add New Income</h3>
+        <form id="incomeForm" class="grid-form">
+          <input type="hidden" id="incEditId">
+          <div class="form-group"><label>Entry Date</label><input type="date" id="incDate" required></div>
+          <div class="form-group"><label>Applicable Month</label><input type="month" id="incMonth" required></div>
+          <div class="form-group full-width"><label>Description</label><input type="text" id="incDesc" required></div>
+          <div class="form-group full-width"><label>Amount (SAR)</label><input type="number" id="incAmount" step="0.01" required></div>
+          <div class="form-group full-width"><label>Notes</label><textarea id="incNotes" rows="2"></textarea></div>
+          <button type="submit" class="btn full-width" id="incSubmit">Save Income</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="expenseModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn" onclick="cancelExpEdit()">&times;</span>
+        <h3 id="expFormTitle" style="margin-top:0;">Schedule New Expense</h3>
+        <form id="expenseForm" class="grid-form">
+          <input type="hidden" id="expEditId">
+          <div class="form-group"><label>Entry Date</label><input type="date" id="expDate" required></div>
+          <div class="form-group"><label>Start Month</label><input type="month" id="expMonth" required></div>
+          <div class="form-group full-width"><label>Description</label><input type="text" id="expDesc" required></div>
+          <div class="form-group"><label>Duration (Months)</label><input type="number" id="expDuration" min="1" value="1" required></div>
+          <div class="form-group"><label>Primary Currency</label><select id="expCurrency"><option value="SAR">SAR</option><option value="PHP">PHP</option></select></div>
+          <div class="currency-box">
+            <div class="form-group"><label>Amount (SAR)</label><input type="number" id="expAmountSAR" step="0.01"></div>
+            <div style="flex: 0; font-size: 20px; color: #9ca3af; text-align: center;">=</div>
+            <div class="form-group"><label>Amount (PHP)</label><input type="number" id="expAmountPHP" step="0.01"></div>
+         </div>
+		  <div class="exchange-note">Live UI Rate: <span id="uiLiveRateExp">Loading...</span> PHP/SAR</div>
+          <div class="form-group hidden" id="expStatusGroup"><label>Status</label><select id="expStatus"><option value="Pending">Pending</option><option value="In-Process">In-Process</option><option value="Paid">Paid</option><option value="Cancelled">Cancelled</option></select></div>
+          <div class="form-group full-width"><label>Notes</label><textarea id="expNotes" rows="2"></textarea></div>
+          
+          <div class="form-group full-width">
+            <button type="button" class="btn" id="expEditBtn" style="background: var(--warning); color: #000; margin-bottom: 5px; display: none;" onclick="toggleExpReadOnly(false)">✏️ Unlock for Editing</button>
+            <button type="submit" class="btn" id="expSubmit">Save Expense</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <div id="loanModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn" onclick="cancelLoanEdit()">&times;</span>
+        <h3 id="loanFormTitle" style="margin-top:0;">Schedule New Loan</h3>
+        <form id="loanForm" class="grid-form">
+          <input type="hidden" id="loanEditId">
+          <div class="form-group"><label>Entry Date</label><input type="date" id="loanDate" required></div>
+          <div class="form-group"><label>Start Month</label><input type="month" id="loanMonth" required></div>
+          <div class="form-group full-width"><label>Description</label><input type="text" id="loanDesc" required></div>
+          <div class="form-group"><label>Duration (Months)</label><input type="number" id="loanDuration" min="1" value="3" required></div>
+          <div class="form-group"><label>Primary Currency</label><select id="loanCurrency"><option value="SAR">SAR</option><option value="PHP">PHP</option></select></div>
+          <div class="currency-box">
+            <div class="form-group"><label>Amount (SAR)</label><input type="number" id="loanAmountSAR" step="0.01"></div>
+            <div style="flex: 0; font-size: 20px; color: #9ca3af; text-align: center;">=</div>
+            <div class="form-group"><label>Amount (PHP)</label><input type="number" id="loanAmountPHP" step="0.01"></div>
+         </div>
+          <div class="exchange-note">Live UI Rate: <span id="uiLiveRateLoan">Loading...</span> PHP/SAR</div>
+          <div class="form-group hidden" id="loanStatusGroup"><label>Status</label><select id="loanStatus"><option value="Pending">Pending</option><option value="In-Process">In-Process</option><option value="Paid">Paid</option><option value="Cancelled">Cancelled</option></select></div>
+          <div class="form-group full-width"><label>Notes</label><textarea id="loanNotes" rows="2"></textarea></div>
+          
+          <div class="form-group full-width">
+            <button type="button" class="btn" id="loanEditBtn" style="background: var(--warning); color: #000; margin-bottom: 5px; display: none;" onclick="toggleLoanReadOnly(false)">✏️ Unlock for Editing</button>
+            <button type="submit" class="btn" id="loanSubmit">Save Loan</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <div id="allowanceModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn" onclick="cancelAlwEdit()">&times;</span>
+        <h3 id="alwFormTitle" style="margin-top:0;">Calculate New Allowance</h3>
+        <form id="allowanceForm" class="grid-form">
+          <input type="hidden" id="alwEditId">
+          <input type="hidden" id="alwEntryDate">
+          <input type="hidden" id="alwMonth">
+          
+          <div class="form-group full-width">
+            <label>Student Name</label>
+            <input type="text" id="alwStudentName" list="studentNamesList" autocomplete="off" required>
+            <datalist id="studentNamesList"></datalist>
+          </div>
+          
+          <div class="form-group"><label>Start Date (Auto)</label><input type="date" id="alwStartDate" readonly style="background:#f3f4f6;"></div>
+          <div class="form-group"><label>End Date (Auto)</label><input type="date" id="alwEndDate" readonly style="background:#f3f4f6;"></div>
+          
+          <div class="form-group full-width">
+            <label>Daily Allowance Breakdown (PHP)</label>
+            <div id="alwCategoriesContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px;"></div>
+            <button type="button" class="btn btn-edit" onclick="addNewCategory()" style="margin-top: 8px;">+ Add New Category</button>
+          </div>
+          
+          <div class="form-group">
+            <label>Total Daily (PHP)</label>
+            <input type="number" id="alwDailyAmount" readonly style="background:#f3f4f6; font-weight:bold; color:var(--text);">
+          </div>
+
+          <div class="form-group" id="singleDayGroup">
+            <label>Total Workdays</label>
+            <div style="display: flex; gap: 5px; align-items: center;">
+              <button type="button" class="btn" style="width:auto; padding: 8px 12px; margin:0;" onclick="adjustDays(-1)">-</button>
+              <input type="number" id="alwTotalDays" style="text-align:center; font-weight:bold; color:var(--primary);" oninput="recalculateTotals()">
+              <button type="button" class="btn" style="width:auto; padding: 8px 12px; margin:0;" onclick="adjustDays(1)">+</button>
+            </div>
+            <small id="autoDaysNote" style="color: #6b7280; margin-top: 4px; font-size: 11px;">Auto calculated: 0</small>
+          </div>
+          
+          <div class="exchange-note" style="font-size: 14px; margin-top: 5px;">
+            <strong>Grand Total:</strong> <span id="alwTotalPHP" style="color:var(--success); font-weight:bold;">0.00</span> PHP 
+          </div>
+
+          <div class="form-group hidden full-width" id="alwStatusGroup"><label>Status</label><select id="alwStatus"><option value="Pending">Pending</option><option value="In-Process">In-Process</option><option value="Paid">Paid</option><option value="Cancelled">Cancelled</option></select></div>
+          
+          <button type="button" class="btn full-width" id="alwEditBtn" style="background: var(--warning); color: #000; margin-bottom: 10px; display: none;" onclick="toggleAlwReadOnly(false)">✏️ Unlock for Editing</button>
+          <button type="submit" class="btn full-width" id="alwSubmit">Save Allowance</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="todoModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal('todoModal')">&times;</span>
+        <h3 id="todoFormTitle" style="margin-top:0;">Add New To-Do Entry</h3>
+        <form id="todoForm" class="grid-form">
+          <input type="hidden" id="todoEditId">
+          <div class="form-group full-width"><label>To-Do Name</label><input type="text" id="todoName" required oninput="generateTodoSummary()"></div>
+          <div class="form-group full-width"><label>Description</label><input type="text" id="todoDesc" required></div>
+          <div class="form-group"><label>Amount</label><input type="number" id="todoAmount" step="0.01" required oninput="generateTodoSummary()"></div>
+          <div class="form-group"><label>Duration (Months)</label><input type="number" id="todoDuration" required min="1" value="1" oninput="generateTodoSummary()"></div>
+          <div class="form-group"><label>Next Bill Date</label><input type="date" id="todoStartDate" required oninput="generateTodoSummary()"></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="todoStatus" onchange="generateTodoSummary()">
+              <option value="Pending">Pending</option>
+              <option value="In-Process">In-Process</option>
+              <option value="Paid">Paid</option>
+            </select>
+          </div>
+          <div class="form-group full-width" style="background: #f0fdf4; padding: 12px; border-left: 4px solid var(--success); border-radius: 4px;">
+            <label style="color: var(--success); margin-bottom: 3px;">Calculation Summary</label>
+            <p id="todoSummaryText" style="font-size: 12px; margin: 0; color: #166534; font-weight: 500; line-height: 1.4;">
+              Fill out the details above to see the schedule summary.
+            </p>
+          </div>
+          <button type="button" class="btn full-width" id="todoEditBtn" style="background: var(--warning); color: #000; margin-bottom: 10px; display: none;" onclick="toggleTodoReadOnly(false)">✏️ Unlock for Editing</button>
+          <button type="submit" class="btn full-width" id="todoSubmit">Save Entry</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="monthSummaryModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 400px;">
+        <span class="close-btn" onclick="closeModal('monthSummaryModal')">&times;</span>
+        <h3 id="summaryMonthTitle" style="margin-top:0; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px;">Month Overview</h3>
+        
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; font-weight: bold; color: #4b5563;">
+          <span>Exchange Rate:</span>
+          <span style="color: var(--primary);"><span id="summaryExchangeRate">--</span> PHP/SAR</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #4b5563;">
+          <span>New Balance:</span>
+          <span style="color: var(--primary);" id="summaryNewBalance">0.00 SAR</span>
+        </div>
+        
+        <div style="background: #fef2f2; padding: 12px; border-radius: 8px; border: 1px solid #fecaca; margin-bottom: 10px;">
+           <div style="font-weight: bold; color: var(--danger); margin-bottom: 8px; font-size: 14px;">Total PHP Obligations</div>
+           <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">(Expenses, Loans, & Allowances)</div>
+           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+             <span>Amount in PHP:</span>
+             <strong id="sumPhpTotal" style="color: var(--danger);">0.00 PHP</strong>
+           </div>
+           <div style="display: flex; justify-content: space-between;">
+             <span>Converted to SAR:</span>
+             <strong id="sumPhpConverted">0.00 SAR</strong>
+           </div>
+        </div>
+
+        <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 15px;">
+           <div style="font-weight: bold; color: var(--success); margin-bottom: 8px; font-size: 14px;">Total SAR Obligations</div>
+           <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">(Expenses & Loans)</div>
+           <div style="display: flex; justify-content: space-between;">
+             <span>Amount in SAR:</span>
+             <strong id="sumSarTotal" style="color: var(--success);">0.00 SAR</strong>
+           </div>
+        </div>
+        
+        <button class="btn full-width" onclick="closeModal('monthSummaryModal')">Close Overview</button>
+      </div>
+    </div>
+	
+    <div id="categorySummaryModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 400px;">
+        <span class="close-btn" onclick="closeModal('categorySummaryModal')">&times;</span>
+        <h3 id="catSummaryTitle" style="margin-top:0; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px;">Category Overview</h3>
+        <div id="catSummaryContent"></div>
+        <button class="btn full-width" style="margin-top: 10px;" onclick="closeModal('categorySummaryModal')">Close Overview</button>
+      </div>
+    </div>
+  </div> 
+  
+  <div id="billsOverviewModal" class="modal hidden">
+  <div class="modal-content" style="max-width: 400px;">
+    <span class="close-btn" onclick="closeModal('billsOverviewModal')">&times;</span>
+<h3 id="billsOverviewTitle" style="margin-top:0; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+    🧾 Bills Overview
+</h3>
+    
+    <div style="background: #fef2f2; padding: 12px; border-radius: 8px; border: 1px solid #fecaca; margin-bottom: 12px;">
+        <div style="font-weight: bold; color: var(--danger); margin-bottom: 8px; font-size: 14px;">⏳ Unpaid / Pending</div>
+        
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+            <span>Items Count:</span> <strong id="unpaidCount">0</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+            <span>Total SAR:</span> <strong id="unpaidSar" style="color: var(--danger);">0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>Total PHP:</span> <strong id="unpaidPhp" style="color: var(--danger);">0.00</strong>
+        </div>
+    </div>
+
+    <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; border: 1px solid #bbf7d0;">
+        <div style="font-weight: bold; color: var(--success); margin-bottom: 8px; font-size: 14px;">✅ Paid</div>
+        
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+            <span>Items Count:</span> <strong id="paidCount">0</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+            <span>Total SAR:</span> <strong id="paidSar" style="color: var(--success);">0.00</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>Total PHP:</span> <strong id="paidPhp" style="color: var(--success);">0.00</strong>
+        </div>
+    </div>
+
+    <button class="btn full-width" style="margin-top: 15px;" onclick="closeModal('billsOverviewModal')">Close Overview</button>
+  </div>
+</div>
+
+<div id="noteModal" class="modal hidden">
+  <div class="modal-content" style="max-width: 350px;">
+    <span class="close-btn" onclick="closeNoteModal()">&times;</span>
+    <h3 style="color: var(--primary); display: flex; align-items: center; gap: 8px;">
+      <span>📝</span> Note Details
+    </h3>
+    
+    <div id="fullNoteText" style="margin-top: 16px; padding: 14px; background: #f8fafc; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: var(--text); max-height: 50vh; overflow-y: auto;">
+    </div>
+
+    <button class="btn full-width" style="margin-top: 20px;" onclick="closeNoteModal()">Close</button>
+  </div>
+</div>
+  
+
+  <script src="main.js"></script> 
+  <script src="dashboard.js"></script>
+  <script src="income.js"></script>
+  <script src="expenses.js"></script>
+  <script src="loans.js"></script>
+  <script src="allowance.js?v=2"></script>
+  <script src="todo.js"></script>
+  <script src="floating.js"></script>
+  <script src="privacy.js"></script>
+
+</body>
+</html>
