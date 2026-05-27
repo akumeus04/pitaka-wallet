@@ -179,6 +179,7 @@ function renderExpenseHistory() {
   // ==========================================
   const statusPriority = {
       "Pending": 1,
+      "In-Process": 1,
       "Paid": 2,
       "Cancelled": 3
   };
