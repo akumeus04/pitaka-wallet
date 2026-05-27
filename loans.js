@@ -177,8 +177,9 @@ function renderLoanHistory() {
   // ==========================================
   const statusPriority = {
       "Pending": 1,
-      "Paid": 2,
-      "Cancelled": 3
+      "In-Process": 2,
+      "Paid": 3,
+      "Cancelled": 4
   };
 
   filtered.sort((a, b) => {
