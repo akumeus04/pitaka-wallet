@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Car Loan Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #3730A3;
+            --bg-color: #EEF2FF;
+            --card-bg: #ffffff;
+            --text-dark: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --pending: #F59E0B;
+            --processing: #3B82F6;
+            --paid: #10B981;
+            --cancel: #EF4444;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        /* ══ LOGIN OVERLAY ══ */
+        .login-overlay {
+            position: fixed; inset: 0;
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
+        }
+        .login-box {
+            background: #fff; padding: 40px 32px; border-radius: 24px;
+            width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-box h2 { font-family: 'Poppins', sans-serif; color: var(--text-dark); margin-bottom: 24px; }
+        .login-error { display: none; background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.85rem; }
+        .form-control {
+            width: 100%; padding: 14px; border: 1.5px solid var(--border); border-radius: 12px;
+            font-family: inherit; font-size: 15px; margin-bottom: 16px; transition: border-color 0.2s;
+        }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+        .btn-primary {
+            width: 100%; padding: 16px; background: var(--primary); color: #fff;
+            border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        /* ══ MAIN APP ══ */
+        .app-container {
+            max-width: 600px; margin: 0 auto; padding: 20px 20px 80px; display: none;
+        }
+        
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; padding-top: 10px;
+        }
+        .header h1 { font-family: 'Poppins', sans-serif; font-size: 1.5rem; color: var(--text-dark); }
+        .btn-logout { background: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--text-muted); font-weight: 600; }
+
+        .card {
+            background: var(--card-bg); padding: 20px; border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 20px;
+        }
+
+        /* Inputs */
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        /* Summary Grid */
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .summary-box { background: var(--bg-color); padding: 16px; border-radius: 12px; text-align: center; border: 1px solid var(--border); }
+        .summary-box.full-width { grid-column: 1 / -1; background: #e0e7ff; border-color: #c7d2fe; }
+        .summary-box h3 { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+        .summary-box p { font-family: 'Poppins', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--primary); }
+
+        /* Year Navigation */
+        .year-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-color); padding: 10px 16px; border-radius: 12px;
+            margin-bottom: 16px; border: 1px solid var(--border);
+        }
+        .year-nav h3 { margin: 0; font-family: 'Poppins', sans-serif; color: var(--text-dark); font-size: 1.2rem; }
+        .btn-nav {
+            background: var(--primary); color: #fff; border: none; padding: 8px 16px;
+            border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-nav:hover { background: var(--primary-dark); }
+        .btn-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Months List */
+        .month-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .month-item:last-child { border-bottom: none; }
+        .month-name { font-weight: 600; color: var(--text-dark); }
+        
+        select.status-dropdown {
+            padding: 8px 14px; border-radius: 20px; border: 1.5px solid transparent;
+            font-weight: 600; font-size: 0.85rem; cursor: pointer; outline: none;
+            appearance: none; text-align: center; width: 130px; font-family: inherit;
+        }
+
+        .status-pending { background-color: #FEF3C7; color: #D97706; border-color: #FCD34D !important; }
+        .status-processing { background-color: #DBEAFE; color: #1D4ED8; border-color: #BFDBFE !important; }
+        .status-paid { background-color: #D1FAE5; color: #047857; border-color: #A7F3D0 !important; }
+        .status-cancel { background-color: #FEE2E2; color: #B91C1C; border-color: #FECACA !important; }
+
+        /* Cloud Status & Save */
+        .cloud-status { text-align: center; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-bottom: 16px; }
+        .floating-save {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: calc(100% - 40px); max-width: 560px;
+            background: var(--primary); color: #fff; padding: 16px;
+            border-radius: 16px; text-align: center; font-weight: 600; font-size: 1rem;
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4); cursor: pointer; border: none;
+            z-index: 100; font-family: 'Poppins', sans-serif; transition: background 0.2s;
+        }
+        .floating-save:hover { background: var(--primary-dark); }
+
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: #1E293B; color: #fff; padding: 12px 24px; border-radius: 50px;
+            font-weight: 500; font-size: 0.9rem; transition: transform 0.4s; z-index: 2000;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+    </style>
+</head>
+<body>
+
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-box">
+            <h2>Sign In</h2>
+            <div id="loginError" class="login-error"></div>
+            <input type="email" id="loginEmail" class="form-control" placeholder="Email Address">
+            <input type="password" id="loginPassword" class="form-control" placeholder="Password">
+            <button class="btn-primary" id="loginBtn" onclick="window.login()">Access Tracker</button>
+        </div>
+    </div>
+
+    <div class="app-container" id="mainApp">
+        <div class="header">
+            <h1>🚘 Car Loan</h1>
+            <button class="btn-logout" onclick="window.logout()">Logout</button>
+        </div>
+
+        <div id="cloudStatus" class="cloud-status">Connecting to Firebase...</div>
+
+        <div class="card">
+            <div class="input-group">
+                <label>Monthly Amortization (₱)</label>
+                <input type="number" id="monthlyAmount" class="form-control" placeholder="e.g. 20000" oninput="window.rebuildSchedule()">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label>Total Months</label>
+                    <input type="number" id="totalMonths" class="form-control" placeholder="e.g. 60" oninput="window.rebuildSchedule()">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label>Start Month</label>
+                    <input type="month" id="startMonth" class="form-control" onchange="window.rebuildSchedule()">
+                </div>
+            </div>
+        </div>
+
+        <div class="card summary-grid">
+            <div class="summary-box full-width">
+                <h3>Calculated Total Loan Amount</h3>
+                <p id="displayTotalAmount">₱ 0.00</p>
+            </div>
+            <div class="summary-box">
+                <h3>Remaining Balance</h3>
+                <p id="remainingAmount">₱ 0.00</p>
+            </div>
+            <div class="summary-box">
+                <h3>Remaining Months</h3>
+                <p id="remainingMonths">0</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="year-nav">
+                <button class="btn-nav" id="btnPrevYear" onclick="window.changeYear(-1)">&#8592;</button>
+                <h3 id="currentYearLabel">Select Start Date</h3>
+                <button class="btn-nav" id="btnNextYear" onclick="window.changeYear(1)">&#8594;</button>
+            </div>
+            <div id="monthsContainer">
+                <p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">
+                    Enter your Total Months and Start Month to generate schedule.
+                </p>
+            </div>
+        </div>
+
+        <button class="floating-save" id="saveBtn" onclick="window.saveData()">💾 Save Setup</button>
+    </div>
+
+    <div class="toast" id="toast">✅ Data Saved!</div>
+
+<script type="module">
+// Notice 'update' was added to the import below!
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// ── FIREBASE CONFIGURATION ──
+const firebaseConfig = {
+    apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
+    authDomain: "finance-app-23309.firebaseapp.com",
+    databaseURL: "https://finance-app-23309-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "finance-app-23309",
+    storageBucket: "finance-app-23309.firebasestorage.app",
+    messagingSenderId: "268979076437",
+    appId: "1:268979076437:web:204abafc00e7558f4e83dc"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+let unsubscribeDb = null;
+
+// ── APP STATE ──
+window.loanData = {
+    payments: {} // Stores status keyed by "YYYY-MM" (e.g., {"2026-06": "Paid"})
+};
+window.schedule = []; // Full array of generated months
+window.currentViewYear = new Date().getFullYear();
+
+// ── AUTHENTICATION ──
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        startDatabaseSync();
+    } else {
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+        if (unsubscribeDb) unsubscribeDb();
+    }
+});
+
+window.login = async function() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const errDiv = document.getElementById('loginError');
+    if (!email || !password) return;
+    btn.textContent = 'Verifying...'; btn.disabled = true; errDiv.style.display = 'none';
+    try { await signInWithEmailAndPassword(auth, email, password); } 
+    catch (error) { errDiv.textContent = 'Invalid email or password.'; errDiv.style.display = 'block'; } 
+    finally { btn.textContent = 'Access Tracker'; btn.disabled = false; }
+};
+
+window.logout = async function() { await signOut(auth); };
+
+// ── LOGIC: BUILD SCHEDULE ──
+window.rebuildSchedule = function() {
+    window.schedule = [];
+    const totalMonths = parseInt(document.getElementById('totalMonths').value) || 0;
+    const startMonthVal = document.getElementById('startMonth').value; // format: "YYYY-MM"
+
+    if (!startMonthVal || totalMonths <= 0) {
+        window.renderMonthsUI();
+        window.calculateLoan();
+        return;
+    }
+
+    let [year, month] = startMonthVal.split('-').map(Number);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    for (let i = 0; i < totalMonths; i++) {
+        let currentMonthNum = month + i;
+        let currentYear = year + Math.floor((currentMonthNum - 1) / 12);
+        let displayMonthIndex = ((currentMonthNum - 1) % 12);
+        
+        let monthStr = (displayMonthIndex + 1).toString().padStart(2, '0');
+        let dateKey = `${currentYear}-${monthStr}`;
+        
+        window.schedule.push({
+            key: dateKey,
+            year: currentYear,
+            label: `${monthNames[displayMonthIndex]} ${currentYear}`
+        });
+    }
+
+    if (!window.schedule.some(m => m.year === window.currentViewYear)) {
+        window.currentViewYear = window.schedule[0].year;
+    }
+
+    window.renderMonthsUI();
+    window.calculateLoan();
+};
+
+// ── UI: RENDER MONTHS AND NAV ──
+window.renderMonthsUI = function() {
+    const container = document.getElementById('monthsContainer');
+    container.innerHTML = '';
+
+    if (window.schedule.length === 0) {
+        document.getElementById('currentYearLabel').innerText = "Select Start Date";
+        document.getElementById('btnPrevYear').disabled = true;
+        document.getElementById('btnNextYear').disabled = true;
+        container.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">Enter your Total Months and Start Month to generate schedule.</p>';
+        return;
+    }
+
+    document.getElementById('currentYearLabel').innerText = window.currentViewYear;
+    
+    document.getElementById('btnPrevYear').disabled = !window.schedule.some(m => m.year === window.currentViewYear - 1);
+    document.getElementById('btnNextYear').disabled = !window.schedule.some(m => m.year === window.currentViewYear + 1);
+
+    const monthsInYear = window.schedule.filter(m => m.year === window.currentViewYear);
+
+    monthsInYear.forEach(m => {
+        let status = window.loanData.payments[m.key] || 'Pending';
+        container.innerHTML += `
+            <div class="month-item">
+                <div class="month-name">${m.label}</div>
+                <select class="status-dropdown status-${status.toLowerCase()}" onchange="window.updateStatus('${m.key}', this)">
+                    <option value="Pending" ${status === 'Pending' ? 'selected' : ''}>Pending</option>
+                    <option value="Processing" ${status === 'Processing' ? 'selected' : ''}>Processing</option>
+                    <option value="Paid" ${status === 'Paid' ? 'selected' : ''}>Paid</option>
+                    <option value="Cancel" ${status === 'Cancel' ? 'selected' : ''}>Cancel</option>
+                </select>
+            </div>
+        `;
+    });
+};
+
+window.changeYear = function(direction) {
+    let newYear = window.currentViewYear + direction;
+    if (window.schedule.some(m => m.year === newYear)) {
+        window.currentViewYear = newYear;
+        window.renderMonthsUI();
+    }
+};
+
+// ── INSTANT FIREBASE AUTO-SAVE (FIXED) ──
+window.updateStatus = async function(key, selectEl) {
+    // 1. Update local UI instantly
+    window.loanData.payments[key] = selectEl.value;
+    selectEl.className = `status-dropdown status-${selectEl.value.toLowerCase()}`;
+    window.calculateLoan();
+
+    // 2. Push this exact status change straight to Firebase
+    try {
+        await update(ref(db, 'car_loan/tracker/payments'), {
+            [key]: selectEl.value
+        });
+        showToast("✅ Status Updated!");
+    } catch (e) {
+        console.error("Error auto-saving status to Firebase:", e);
+    }
+};
+
+// ── CALCULATIONS ──
+window.calculateLoan = function() {
+    const monthlyAmount = parseFloat(document.getElementById('monthlyAmount').value) || 0;
+    const totalMonths = window.schedule.length;
+
+    const totalAmount = monthlyAmount * totalMonths;
+
+    let paidCount = 0;
+    window.schedule.forEach(m => {
+        if (window.loanData.payments[m.key] === 'Paid') {
+            paidCount++;
+        }
+    });
+
+    let remainingAmount = totalAmount - (paidCount * monthlyAmount);
+    if (remainingAmount < 0) remainingAmount = 0;
+
+    let remainingMonths = totalMonths - paidCount;
+    if (remainingMonths < 0) remainingMonths = 0;
+
+    document.getElementById('displayTotalAmount').innerText = "₱ " + totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('remainingAmount').innerText = "₱ " + remainingAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('remainingMonths').innerText = remainingMonths;
+};
+
+// ── DATABASE SYNC ──
+function startDatabaseSync() {
+    const loanRef = ref(db, 'car_loan/tracker');
+    
+    unsubscribeDb = onValue(loanRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            document.getElementById('monthlyAmount').value = data.monthlyAmount || '';
+            document.getElementById('totalMonths').value = data.totalMonths || '';
+            document.getElementById('startMonth').value = data.startMonth || '';
+            
+            // Load saved payment statuses securely
+            window.loanData.payments = data.payments || {};
+            
+            window.rebuildSchedule();
+        }
+        document.getElementById('cloudStatus').innerHTML = '✅ Synced with Firebase';
+    });
+}
+
+window.saveData = async function() {
+    const btn = document.getElementById('saveBtn');
+    btn.innerHTML = '⏳ Saving...'; btn.disabled = true;
+
+    const data = {
+        monthlyAmount: parseFloat(document.getElementById('monthlyAmount').value) || 0,
+        totalMonths: parseInt(document.getElementById('totalMonths').value) || 0,
+        startMonth: document.getElementById('startMonth').value || '',
+        payments: window.loanData.payments
+    };
+
+    try {
+        await set(ref(db, 'car_loan/tracker'), data);
+        showToast("✅ Setup Saved!");
+    } catch (e) {
+        console.error(e);
+        alert("Error saving data!");
+    } finally {
+        btn.innerHTML = '💾 Save Setup'; btn.disabled = false;
+    }
+};
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (msg) t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+</script>
+</body>
+</html>
