@@ -1058,36 +1058,38 @@
 <div id="view-expenses" class="view-section hidden">
   <div class="card">
     <div class="ledger-header">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
-        <h3 style="margin: 0;">Expense Ledger</h3>
-      </div>
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <img src="dancing_futuristic_robot.gif" width="30" alt="Dancing AI Robot">
+    <h3 style="margin: 0;">Expense Ledger</h3>
+  </div>
       
 <div class="header-actions">
-  <button class="btn" onclick="openBillsOverviewModal('expenses')" style="background: #8b5cf6;">🧾 Bills Overview</button>
-  
-  <button class="btn" onclick="openCategoryOverview('expenses')" style="background: #0ea5e9;">📊 Overview</button>
-  <button class="btn" onclick="openNewExpModal()">+ Add Expense</button>
-</div>
-    </div>
+    <button class="btn" onclick="openBillsOverviewModal('expenses')" style="background: #8b5cf6;">🧾 Bills Overview</button>
+    <button class="btn" onclick="openCategoryOverview('expenses')" style="background: #0ea5e9;">📊 Overview</button>
+    <button class="btn" onclick="openNewExpModal()">+ Add Expense</button>
     
-    <input type="text" id="searchExpenses" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderExpenseHistory()">
-    
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th>SAR/Mo</th>
-            <th>Status</th>
-            <th>Notes</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="expenseTableBody"></tbody>
-      </table>
-    </div>
+    <button class="btn" onclick="duplicateSelectedExpenses()" style="background: #10b981; color: white;">☑️ Duplicate Selected</button>
+    <button class="btn" onclick="duplicateAllExpensesToNextMonth()" style="background: var(--warning); color: #000;">📑 Duplicate All</button>
   </div>
+</div>
+    
+<input type="text" id="searchExpenses" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderExpenseHistory()">
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30px;"><input type="checkbox" id="selectAllExp" onclick="toggleAllExpCheckboxes()"></th>
+        <th>Date</th>
+        <th>Description</th>
+        <th>SAR/Mo</th>
+        <th>Status</th>
+        <th>Notes</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="expenseTableBody"></tbody>
+  </table>
 </div>
 	
 
