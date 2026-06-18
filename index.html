@@ -284,6 +284,13 @@
       box-shadow: none;
     }
 
+	  /* Ensure checkbox column stays thin and consistent */
+th:has(input[type="checkbox"]), td:has(input[type="checkbox"]) {
+  width: 30px;
+  text-align: center;
+  padding: 10px 5px !important;
+}
+
     /* ── TABLES ── */
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-md); }
 
@@ -1110,7 +1117,7 @@
     <input type="text" id="searchLoans" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderLoanHistory()">
     <div class="table-wrapper">
       <table>
-        <thead><tr><th>Description</th><th>SAR/Mo</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th>SAR/Mo</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead>
         <tbody id="loanTableBody"></tbody>
       </table>
     </div>
@@ -1154,16 +1161,7 @@
     <div id="todoAlertsContainer"></div>
     <div class="table-wrapper">
       <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Current Due Date</th>
-            <th>Amount</th>
-            <th>Status / Alert</th>
-            <th>Action</th>
-          </tr>
-        </thead>
+<thead><tr><th>Name</th><th>Description</th><th>Due Date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
         <tbody id="todoTableBody"></tbody>
       </table>
     </div>
