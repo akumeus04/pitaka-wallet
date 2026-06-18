@@ -231,13 +231,30 @@ if (filtered.length === 0) {
       subAmountHTML = `<br><small style="color: #9ca3af; font-size: 11px;">${parseFloat(exp["Total Amount"] || 0).toFixed(2)} PHP</small>`;
     }
 
+    // --- NEW FORMATTING LOGIC (Payment X of Y) ---
+    let rawDesc = exp["Description"] || "";
+    let cleanDesc = rawDesc;
+    let paymentText = ""; 
+
+    // Scans for the "(X/Y)" pattern at the end of the description
+    const descMatch = rawDesc.match(/(.*?)\s*\((\d+)\/(\d+)\)$/);
+    if (descMatch) {
+      cleanDesc = descMatch[1].trim(); 
+      paymentText = `<br><small style="color: #6b7280; font-weight: normal;">Payment ${descMatch[2]} of ${descMatch[3]}</small>`; 
+    } else if (parseInt(exp["Duration (Months)"]) > 1) {
+      paymentText = `<br><small style="color: #6b7280; font-weight: normal;">${exp["Duration (Months)"]} mo(s)</small>`;
+    }
+
+    // Cross out the amount visually if it's Cancelled
+    let amountStyle = exp["Status"] === "Cancelled" ? "text-decoration: line-through; color: #9ca3af;" : "color: var(--danger); font-weight: bold;";
+
+    // Final HTML Build (Includes Checkbox, Formatting, and Clean Descriptions)
     tr.style = rowStyle;
     tr.innerHTML = `
       <td><input type="checkbox" class="exp-checkbox" value="${exp["ID"]}"></td>
-      
       <td><small>${displayDate}</small><br><strong>${exp["Start Month"]}</strong></td>
-      <td><strong>${exp["Description"]}</strong></td>
-      <td style="color: var(--danger); font-weight: bold;">
+      <td><strong>${cleanDesc}</strong>${paymentText}</td>
+      <td style="${amountStyle}">
         ${parseFloat(exp["Monthly Deduction (SAR)"] || 0).toFixed(2)}
         ${subAmountHTML}
       </td>
@@ -247,41 +264,6 @@ if (filtered.length === 0) {
          <div style="display: flex; gap: 5px;">
            <button class="btn btn-edit" onclick="triggerExpEdit('${exp["ID"]}')" style="margin: 0; padding: 5px 10px; font-size: 11px;">Edit</button>
          </div>
-      </td>
-    `;
-    expBody.appendChild(tr);
-  });
-
-    // --- NEW FORMATTING LOGIC ---
-    let rawDesc = exp["Description"] || "";
-    let cleanDesc = rawDesc;
-    let paymentText = "One-time payment"; // Default for single-month items
-
-    // This scans for the "(X/Y)" pattern at the end of the description
-    const descMatch = rawDesc.match(/(.*?)\s*\((\d+)\/(\d+)\)$/);
-    if (descMatch) {
-      cleanDesc = descMatch[1].trim(); // The clean name (e.g., "Car Loan")
-      paymentText = `Payment ${descMatch[2]} out of ${descMatch[3]}`; // The extracted numbers
-    } else if (parseInt(exp["Duration (Months)"]) > 1) {
-      // Fallback for old legacy entries
-      paymentText = `${exp["Duration (Months)"]} mo(s)`;
-    }
-    // ----------------------------
-    
-    // Cross out the amount visually if it's Cancelled
-    let amountStyle = exp["Status"] === "Cancelled" ? "text-decoration: line-through; color: #9ca3af;" : "color: var(--danger); font-weight: bold;";
-    
-    tr.style = rowStyle;
-    tr.innerHTML = `
-      <td><strong>${cleanDesc}</strong><br><small style="color: #6b7280;">${paymentText}</small><br><span class="mobile-status-badge"><span class="badge ${String(exp["Status"]).replace(/\s+/g, '-')}">${exp["Status"]}</span></span></td>
-      <td style="${amountStyle}">
-        ${parseFloat(exp["Monthly Deduction (SAR)"] || 0).toFixed(2)}
-        ${subAmountHTML}
-      </td>
-      <td class="mobile-hide"><span class="badge ${String(exp["Status"]).replace(/\s+/g, '-')}">${exp["Status"]}</span></td>
-      <td>${noteText}</td>
-      <td>
-         <button class="btn btn-edit" onclick="triggerExpView('${exp["ID"]}')" style="margin: 0; width: 100%; text-align: center; background: #0ea5e9; color: white;">View / Edit</button>
       </td>
     `;
     expBody.appendChild(tr);
