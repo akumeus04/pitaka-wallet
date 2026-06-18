@@ -155,6 +155,7 @@ document.getElementById('loanForm').addEventListener('submit', (e) => {
 
 function renderLoanHistory() {
   const loanBody = document.querySelector('#loanTableBody');
+  if(!loanBody) return;
   loanBody.innerHTML = "";
   
   const searchInput = document.getElementById('searchLoans');
@@ -162,7 +163,7 @@ function renderLoanHistory() {
 
   let filtered = masterData.loans.filter(loan => isItemActiveInMonth(loan, activeBrowserMonth)).reverse();
   
-// Apply Search Filter
+  // Apply Search Filter
   if (query) {
     filtered = filtered.filter(loan => {
       const desc = String(loan["Description"] || "").toLowerCase();
@@ -172,9 +173,7 @@ function renderLoanHistory() {
     });
   }
   
-  // ==========================================
-  // ⬇️ ADD THIS NEW SORTING LOGIC ⬇️
-  // ==========================================
+  // Apply Sorting Logic
   const statusPriority = {
       "Pending": 1,
       "In-Process": 2,
@@ -183,35 +182,30 @@ function renderLoanHistory() {
   };
 
   filtered.sort((a, b) => {
-      // Get the priority number (default to 99 if the status is somehow missing)
       let priorityA = statusPriority[a["Status"]] || 99;
       let priorityB = statusPriority[b["Status"]] || 99;
       
-      // Sort by status priority first
       if (priorityA !== priorityB) {
           return priorityA - priorityB;
       }
       
-      // If the statuses are the SAME, fallback to sorting by Date (newest first)
       let dateA = new Date(a["Entry Date"] || 0);
       let dateB = new Date(b["Entry Date"] || 0);
       return dateB - dateA; 
   });
-  // ==========================================
-  // ⬆️ END OF NEW SORTING LOGIC ⬆️
-  // ==========================================
 
   if (filtered.length === 0) {
-    loanBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#6b7280;">No matching loans found.</td></tr>`;
+    loanBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#6b7280;">No matching loans found.</td></tr>`;
     return;
   }
 
-filtered.forEach(loan => {
+  filtered.forEach(loan => {
     let tr = document.createElement('tr');
     let displayDate = loan["Entry Date"] ? String(loan["Entry Date"]).substring(0, 10) : "N/A";
     
     let rowStyle = (loan["Archived"] === true || loan["Archived"] === "TRUE" || loan["Status"] === "Paid" || loan["Status"] === "Cancelled") ? "opacity: 0.5;" : "";
-    // --- NEW NOTE BUBBLE LOGIC ---
+    
+    // Note Bubble Logic
     let rawNote = loan["Notes"] || "";
     let noteText = "";
     if (rawNote.trim() !== "") {
@@ -220,31 +214,30 @@ filtered.forEach(loan => {
         noteText = `<span class="empty-note">-</span>`;
     }
     
+    // PHP Sub-Amount Logic
     let subAmountHTML = "";
     if (loan["Currency"] === "PHP") {
       subAmountHTML = `<br><small style="color: #9ca3af; font-size: 11px;">${parseFloat(loan["Total Amount"] || 0).toFixed(2)} PHP</small>`;
     }
     
-    // --- NEW FORMATTING LOGIC ---
+    // Formatting Logic
     let rawDesc = loan["Description"] || "";
     let cleanDesc = rawDesc;
-    let paymentText = "One-time payment"; // Default for single-month items
+    let paymentText = "One-time payment"; 
 
-    // This scans for the "(X/Y)" pattern at the end of the description
     const descMatch = rawDesc.match(/(.*?)\s*\((\d+)\/(\d+)\)$/);
     if (descMatch) {
-      cleanDesc = descMatch[1].trim(); // The clean name 
-      paymentText = `Payment ${descMatch[2]} out of ${descMatch[3]}`; // The extracted numbers
+      cleanDesc = descMatch[1].trim(); 
+      paymentText = `Payment ${descMatch[2]} of ${descMatch[3]}`; 
     } else if (parseInt(loan["Duration (Months)"]) > 1) {
-      // Fallback for old legacy entries
       paymentText = `${loan["Duration (Months)"]} mo(s)`;
     }
-    // ----------------------------
 
     let amountStyle = loan["Status"] === "Cancelled" ? "text-decoration: line-through; color: #9ca3af;" : "color: var(--warning); font-weight: bold;";
 
     tr.style = rowStyle;
     tr.innerHTML = `
+      <td class="mobile-hide"><small>${displayDate}</small><br><strong>${loan["Start Month"] || ""}</strong></td>
       <td><strong>${cleanDesc}</strong><br><small style="color: #6b7280;">${paymentText}</small><br><span class="mobile-status-badge"><span class="badge ${String(loan["Status"]).replace(/\s+/g, '-')}">${loan["Status"]}</span></span></td>
       <td style="${amountStyle}">
         ${parseFloat(loan["Monthly Deduction (SAR)"] || 0).toFixed(2)}
