@@ -35,7 +35,7 @@ function renderDashboard() {
   let dateCursor = new Date();
   dateCursor.setMonth(dateCursor.getMonth() - 1); // Start from Last Month
   
-  for(let i = 0; i < 12; i++) {
+  for(let i = 0; i < 24; i++) {
     let y = dateCursor.getFullYear();
     let m = String(dateCursor.getMonth() + 1).padStart(2, '0');
     let monthStr = `${y}-${m}`;
