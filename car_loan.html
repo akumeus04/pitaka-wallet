@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Car Loan Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -134,12 +134,6 @@
             appearance: none; text-align: center; width: 130px; font-family: inherit;
         }
 
-        /* Read-only badge for locked Archive (Paid) months — no dropdown, no editing */
-        .status-badge {
-            display: inline-block; padding: 8px 14px; border-radius: 20px; border: 1.5px solid transparent;
-            font-weight: 600; font-size: 0.85rem; text-align: center; width: 130px; cursor: default;
-        }
-
         .status-pending { background-color: #FEF3C7; color: #D97706; border-color: #FCD34D !important; }
         .status-processing { background-color: #DBEAFE; color: #1D4ED8; border-color: #BFDBFE !important; }
         .status-paid { background-color: #D1FAE5; color: #047857; border-color: #A7F3D0 !important; }
@@ -194,7 +188,6 @@
             display: flex; justify-content: space-between; align-items: center; gap: 12px;
             padding: 10px 0; border-top: 1px solid var(--border);
         }
-        .toggle-row + .toggle-row { border-top: 1px solid var(--border); }
         .toggle-row-label { font-size: 0.88rem; font-weight: 600; color: var(--text-dark); }
         .toggle-row-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
         .switch { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
@@ -235,16 +228,16 @@
     <div class="drawer" id="settingsDrawer">
         <div class="drawer-header">
             <h2>⚙️ Loan Setup</h2>
-            <button class="btn-close-drawer" onclick="window.closeDrawer()">✕</button>
+            <button class="btn-close-drawer" onclick="window.closeDrawer()" aria-label="Close Loan Setup">✕</button>
         </div>
 
         <div class="input-group">
             <label>Monthly Amortization (₱)</label>
-            <input type="number" id="monthlyAmount" class="form-control" placeholder="e.g. 20000" oninput="window.rebuildSchedule()">
+            <input type="number" id="monthlyAmount" class="form-control" placeholder="e.g. 20000" oninput="window.rebuildScheduleDebounced()">
         </div>
         <div class="input-group">
             <label>Total Months</label>
-            <input type="number" id="totalMonths" class="form-control" placeholder="e.g. 60" oninput="window.rebuildSchedule()">
+            <input type="number" id="totalMonths" class="form-control" placeholder="e.g. 60" oninput="window.rebuildScheduleDebounced()">
         </div>
         <div class="input-group" style="margin-bottom: 4px;">
             <label>Start Month</label>
@@ -269,7 +262,7 @@
     <div class="app-container" id="mainApp">
         <div class="header">
             <div class="header-left">
-                <button class="btn-icon" id="burgerBtn" onclick="window.openDrawer()" title="Loan Setup">☰</button>
+                <button class="btn-icon" id="burgerBtn" onclick="window.openDrawer()" title="Loan Setup" aria-label="Open Loan Setup">☰</button>
                 <h1>🚘 Car Loan</h1>
             </div>
             <button class="btn-logout" onclick="window.logout()">Logout</button>
@@ -298,9 +291,9 @@
 
         <div class="card">
             <div class="year-nav">
-                <button class="btn-nav" id="btnPrevYear" onclick="window.changeYear(-1)">&#8592;</button>
+                <button class="btn-nav" id="btnPrevYear" onclick="window.changeYear(-1)" aria-label="Previous year">&#8592;</button>
                 <h3 id="currentYearLabel">Select Start Date</h3>
-                <button class="btn-nav" id="btnNextYear" onclick="window.changeYear(1)">&#8594;</button>
+                <button class="btn-nav" id="btnNextYear" onclick="window.changeYear(1)" aria-label="Next year">&#8594;</button>
             </div>
 
             <div class="list-tabs">
@@ -401,6 +394,15 @@ window.login = async function() {
 
 window.logout = async function() { await signOut(auth); };
 
+// ── DEBOUNCE HELPER (avoid rebuilding the schedule on every keystroke) ──
+function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
 // ── LOGIC: BUILD SCHEDULE ──
 window.rebuildSchedule = function() {
     window.schedule = [];
@@ -438,6 +440,7 @@ window.rebuildSchedule = function() {
     window.renderMonthsUI();
     window.calculateLoan();
 };
+window.rebuildScheduleDebounced = debounce(window.rebuildSchedule, 350);
 
 // ── UI: SCHEDULE / ARCHIVE TABS ──
 window.switchListTab = function(tab) {
@@ -492,11 +495,10 @@ window.renderMonthsUI = function() {
         return;
     }
 
-    visibleMonths.forEach(m => {
+    // We use the same editable dropdown for BOTH the Schedule and the Archive tabs
+    const rowsHtml = visibleMonths.map(m => {
         let status = window.loanData.payments[m.key] || 'Pending';
-
-        // We use the same editable dropdown for BOTH the Schedule and the Archive tabs
-        container.innerHTML += `
+        return `
             <div class="month-item">
                 <div class="month-name">${m.label}</div>
                 <select class="status-dropdown status-${status.toLowerCase()}" onchange="window.updateStatus('${m.key}', this)">
@@ -507,7 +509,9 @@ window.renderMonthsUI = function() {
                 </select>
             </div>
         `;
-    });
+    }).join('');
+
+    container.innerHTML = rowsHtml;
 };
 
 window.changeYear = function(direction) {
@@ -607,7 +611,7 @@ window.saveData = async function() {
         window.closeDrawer();
     } catch (e) {
         console.error(e);
-        alert("Error saving data!");
+        showToast("❌ Error saving data");
     } finally {
         btn.innerHTML = '💾 Save Setup'; btn.disabled = false;
     }
