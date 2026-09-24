@@ -124,21 +124,71 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   }
 });
 
-// Navigation Bar Logic
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
-    e.target.classList.add('active');
-    const targetView = e.target.dataset.target;
-    document.getElementById(targetView).classList.remove('hidden');
-    
+// ==========================================
+// MOBILE-FRIENDLY NAVIGATION & HISTORY API
+// ==========================================
+
+// 1. Core function to switch views and update UI
+function switchView(targetView, addToHistory = true) {
+  // Hide all views and remove active class from all buttons
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+
+  // Find the requested button and view
+  const activeBtn = document.querySelector(`.nav-btn[data-target="${targetView}"]`);
+  const activeView = document.getElementById(targetView);
+
+  if (activeBtn && activeView) {
+    activeBtn.classList.add('active');
+    activeView.classList.remove('hidden');
+
     if(targetView === 'view-dashboard') {
       document.getElementById('globalMonthBrowser').classList.add('hidden');
     } else {
       document.getElementById('globalMonthBrowser').classList.remove('hidden');
     }
+
+    // Push the state to the mobile browser's history stack
+    if (addToHistory) {
+      history.pushState({ view: targetView }, "", "#" + targetView.replace('view-', ''));
+    }
+  }
+}
+
+// 2. Attach the click listener to your Nav Buttons
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const targetView = e.target.dataset.target;
+    // Call switchView and explicitly tell it to add this click to browser history
+    switchView(targetView, true);
   });
+});
+
+// 3. Set the default initial state when the app loads so the first 'back' click doesn't exit
+window.addEventListener('load', () => {
+   history.replaceState({ view: 'view-dashboard' }, "", "#dashboard");
+});
+
+// 4. Intercept the mobile device's physical/swipe "Back" button
+window.addEventListener('popstate', (e) => {
+  // BONUS: If a modal (Add Expense, Summary, etc.) is open, close the modal FIRST instead of changing tabs!
+  const openModal = document.querySelector('.modal:not(.hidden)');
+  if (openModal) {
+    closeModal(openModal.id);
+    
+    // The browser already consumed a 'back' action, so we push the current tab back in to fix the history stack
+    const currentTab = document.querySelector('.nav-btn.active').dataset.target;
+    history.pushState({ view: currentTab }, "", "#" + currentTab.replace('view-', ''));
+    return;
+  }
+
+  // If no modal is open, navigate to the previous tab in the history stack
+  if (e.state && e.state.view) {
+    switchView(e.state.view, false); // Pass 'false' so we don't infinitely push states while going backward
+  } else {
+    // Fallback failsafe
+    switchView('view-dashboard', false);
+  }
 });
 
 // Month Browser Logic
