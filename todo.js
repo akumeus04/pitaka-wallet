@@ -127,13 +127,16 @@ function renderTodoDashboard() {
       let diffDays = Math.round((due - today) / (1000 * 60 * 60 * 24));
       let targetMonthStr = `${y}-${String(m).padStart(2, '0')}`;
       
-      if (diffDays < 0) {
+		// IF DUE TODAY OR PAST DUE -> RED ALERT
+      if (diffDays <= 0) { 
         globalRedCount++;
         if (!earliestRedDate || due < earliestRedDate) {
           earliestRedDate = due;
           targetRedMonth = targetMonthStr;
         }
-      } else if (diffDays <= 5) {
+      } 
+       // IF 1 TO 5 DAYS REMAINING -> ORANGE ALERT
+      else if (diffDays <= 5) { 
         globalOrangeCount++;
         if (!earliestOrangeDate || due < earliestOrangeDate) {
           earliestOrangeDate = due;
@@ -182,12 +185,19 @@ function renderTodoDashboard() {
     let alertBadge = "";
     let trStyle = "";
 
-    if (todo.status !== "Paid") {
+	if (todo.status !== "Paid") {
       if (diffDays < 0) {
+        // ALREADY PAST DUE
         hasRedAlert = true;
         alertBadge = `<span class="badge" style="background: #ef4444; color: white; animation: pulse 2s infinite;">Past Due!</span>`;
         trStyle = "background-color: #fef2f2;"; 
+      } else if (diffDays === 0) {
+        // 🚨 NEW: DUE TODAY (0 DAYS)
+        hasRedAlert = true;
+        alertBadge = `<span class="badge" style="background: #ef4444; color: white; animation: pulse 2s infinite;">Due Today!</span>`;
+        trStyle = "background-color: #fef2f2;"; 
       } else if (diffDays <= 5) {
+        // NEARING (1-5 DAYS)
         alertBadge = `<span class="badge" style="background: #f97316; color: white;">Nearing (${diffDays} days)</span>`;
         trStyle = "background-color: #fff7ed;"; 
       }
