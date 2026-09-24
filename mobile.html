@@ -2433,3 +2433,110 @@ function initModalSwipeClose() {
 
   })();
   </script>
+
+<!-- ══════════════════════════════════════════
+       PWA HARDWARE BACK BUTTON ROUTER
+       ══════════════════════════════════════════ -->
+  <script>
+  (function() {
+    'use strict';
+
+    // 1. Establish a baseline history state when the PWA opens so it doesn't instantly exit
+    window.addEventListener('load', () => {
+      if (!history.state) {
+        history.replaceState({ page: 'view-dashboard' }, "", "#dashboard");
+      }
+    });
+
+    // 2. Intercept Tab Clicks to push history
+    document.querySelectorAll('.nav-btn, .mobile-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = btn.dataset.target;
+        // Only push state if we are actually changing tabs
+        if (history.state && history.state.page === target) return;
+        history.pushState({ page: target }, "", "#" + target.replace('view-', ''));
+      });
+    });
+
+    // 3. Intercept Modal Opens to push history (so BACK button closes the modal)
+    const originalOpenModal = window.openModal;
+    window.openModal = function(modalId) {
+      history.pushState({ modal: modalId }, "", "#" + modalId);
+      
+      if (typeof originalOpenModal === 'function') {
+        originalOpenModal(modalId);
+      } else {
+        document.getElementById(modalId).classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
+    const originalCloseModal = window.closeModal;
+    window.closeModal = function(modalId) {
+      // If closing via UI button (X or Save), pop the history state to keep it clean
+      if (history.state && history.state.modal === modalId) {
+        history.back(); // This triggers 'popstate' which handles the actual closing
+      } else {
+        if (typeof originalCloseModal === 'function') {
+          originalCloseModal(modalId);
+        } else {
+          document.getElementById(modalId).classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      }
+    };
+
+    // 4. Handle the Hardware Back Button (The magic happens here)
+    window.addEventListener('popstate', (e) => {
+      
+      // Step A: Forcibly close ANY open modals first
+      const openModals = document.querySelectorAll('.modal:not(.hidden)');
+      if (openModals.length > 0) {
+        openModals.forEach(modal => modal.classList.add('hidden'));
+        document.body.style.overflow = '';
+        document.body.classList.remove('modal-lock');
+        
+        // If we closed a modal, stop executing. We stay on the current tab.
+        return; 
+      }
+
+      // Step B: Navigate to the correct tab based on the history stack
+      const targetView = (e.state && e.state.page) ? e.state.page : 'view-dashboard';
+      
+      // Hide all sections
+      document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn, .mobile-tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.color = '';
+        const icon = b.querySelector('span:first-child');
+        if(icon) icon.style.transform = '';
+      });
+
+      // Show the target section
+      const activeView = document.getElementById(targetView);
+      if (activeView) activeView.classList.remove('hidden');
+
+      // Highlight Top Nav
+      const topBtn = document.querySelector(`.nav-btn[data-target="${targetView}"]`);
+      if (topBtn) topBtn.classList.add('active');
+
+      // Highlight Bottom Nav
+      const botBtn = document.querySelector(`.mobile-tab-btn[data-target="${targetView}"]`);
+      if (botBtn) {
+        botBtn.classList.add('active');
+        botBtn.style.color = 'var(--primary)';
+        const icon = botBtn.querySelector('span:first-child');
+        if(icon) icon.style.transform = 'scale(1.15)';
+      }
+
+      // Toggle Month Browser visibility
+      if(targetView === 'view-dashboard') {
+        document.getElementById('globalMonthBrowser').classList.add('hidden');
+      } else {
+        document.getElementById('globalMonthBrowser').classList.remove('hidden');
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
