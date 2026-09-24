@@ -397,7 +397,7 @@ function renderCalendar() {
         const dayHolidays = calHolidays.filter(h => h.date === dateStr);
         const dayNotes = calPersonalNotes.filter(n => n.date === dateStr);
         
-        const hasGoogleEntry = dayHolidays.some(h => h.country === 'Personal_Entry');
+        const hasGoogleEntry = dayHolidays.some(h => h.country === 'Personal_Entry' || h.country === 'Personal');
         if (dayNotes.length > 0 || hasGoogleEntry) {
             classes.push("has-personal");
         }
@@ -405,9 +405,10 @@ function renderCalendar() {
         let hasPH = false, hasSA = false;
         dayHolidays.forEach(h => {
             let type = 'google'; 
-            if (h.country === 'Philippines') { hasPH = true; type = 'ph'; } 
-            else if (h.country === 'Saudi Arabia') { hasSA = true; type = 'sa'; } 
-            else if (h.country === 'Personal_Entry') { type = 'personal-sync'; }
+            // UPDATED MATCHING LOGIC
+            if (h.country === 'Philippines' || h.country === 'PH') { hasPH = true; type = 'ph'; } 
+            else if (h.country === 'Saudi Arabia' || h.country === 'SA') { hasSA = true; type = 'sa'; } 
+            else if (h.country === 'Personal_Entry' || h.country === 'Personal') { type = 'personal-sync'; }
             
             monthlyEventsLog.push({ date: dateStr, title: h.name, type: type, day: d });
         });
@@ -442,14 +443,15 @@ function openDayView(dateStr, dayNum) {
     let existingHtml = "";
     calHolidays.filter(h => h.date === dateStr).forEach(h => {
         let badge = '📌'; 
-        if (h.country === 'Philippines') badge = '🇵🇭';
-        else if (h.country === 'Saudi Arabia') badge = '🇸🇦';
+        // UPDATED MATCHING LOGIC
+        if (h.country === 'Philippines' || h.country === 'PH') badge = '🇵🇭';
+        else if (h.country === 'Saudi Arabia' || h.country === 'SA') badge = '🇸🇦';
 
         let cssClass = 'personal'; 
-        if (h.country === 'Philippines') cssClass = 'ph';
-        else if (h.country === 'Saudi Arabia') cssClass = 'sa';
+        if (h.country === 'Philippines' || h.country === 'PH') cssClass = 'ph';
+        else if (h.country === 'Saudi Arabia' || h.country === 'SA') cssClass = 'sa';
 
-        let prefix = (h.country === 'Personal_Entry') ? '' : 'Holiday: ';
+        let prefix = (h.country === 'Personal_Entry' || h.country === 'Personal') ? '' : 'Holiday: ';
         
         existingHtml += `<div class="event-log-item ${cssClass}">${badge} <strong>${prefix}${h.name}</strong></div>`;
     });
