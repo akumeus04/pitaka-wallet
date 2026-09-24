@@ -492,6 +492,16 @@ pad.addEventListener('input', () => {
       .catch(() => setStatus('Could not save. Check your connection.', 'err'));
   }, 1000);
 });
+
+    // Create a history state so the phone's back button can be intercepted
+    window.history.pushState({ page: 'calculator' }, "", "");
+    
+    // When the hardware back button is pressed, force a redirect to mobile.html
+    window.addEventListener('popstate', function() {
+      window.location.href = "mobile.html";
+    });
+    // --------------------------------
+  
 </script>
 </body>
 </html>
