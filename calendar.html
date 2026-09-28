@@ -589,6 +589,18 @@ function linkify(text) {
   return esc(text).replace(/(https?:\/\/[^\s<]+)/g, m => {
     const trail = (m.match(/[.,:!?)\]]+$/) || [''])[0];
     const url = m.slice(0, m.length - trail.length);
+    
+    // Format the Google Calendar fallback link for mobile
+    if (url.includes('g.co/calendar')) {
+      return `<br><br><a href="${url}" target="_blank" rel="noopener noreferrer" class="btn ghost" style="padding: 8px 12px; font-size: 12px; border-color: var(--fl-c); color: var(--fl-c); display: inline-flex;">📅 Open in Google Calendar App (Mobile)</a>${trail}`;
+    }
+    
+    // Format the Gmail link for desktop
+    if (url.includes('mail.google.com')) {
+      return `<br><a href="${url}" target="_blank" rel="noopener noreferrer" style="color: var(--accent); font-weight: 600; font-size: 13px;">📧 Open Email Thread (Desktop)</a>${trail}`;
+    }
+    
+    // Default rendering for any other links
     return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${trail}`;
   });
 }
