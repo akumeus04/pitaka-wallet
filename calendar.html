@@ -491,7 +491,7 @@ fetchHolidays();
 // PWA Back Button Handling
 window.history.pushState({ page: 'calendar' }, "", "");
 window.addEventListener('popstate', function() {
-  window.location.href = "mobile.html";
+  window.history.back();
 });
 </script>
 </body>
