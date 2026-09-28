@@ -491,9 +491,15 @@ fetchHolidays();
 // Create a history state so the phone's back button can be intercepted
 window.history.pushState({ page: 'calendar' }, "", "");
 
-// When the hardware back button is pressed, return to the previous page
+// When the hardware back button is pressed, handle it safely
 window.addEventListener('popstate', function() {
-  window.history.back();
+  // If the browser history is too short (e.g., opened in a new tab), force it to the dashboard
+  if (window.history.length <= 2 || !document.referrer) {
+    window.location.replace("mobile.html");
+  } else {
+    // Otherwise, go back to the previous page naturally
+    window.history.back();
+  }
 });
 // --------------------------------
 </script>
