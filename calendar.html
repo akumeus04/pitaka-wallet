@@ -585,14 +585,19 @@ function relLabel(s) {
   if (diff === -1) return 'Yesterday';
   return diff > 0 ? `In ${diff} days` : `${-diff} days ago`;
 }
-function linkify(text) {
+function linkify(text, dateStr) {
   return esc(text).replace(/(https?:\/\/[^\s<]+)/g, m => {
     const trail = (m.match(/[.,:!?)\]]+$/) || [''])[0];
     const url = m.slice(0, m.length - trail.length);
     
-    // Format the Google Calendar fallback link for mobile
+    // Intercept the generic g.co link and force a direct day-view calendar link
     if (url.includes('g.co/calendar')) {
-      return `<br><br><a href="${url}" target="_blank" rel="noopener noreferrer" class="btn ghost" style="padding: 8px 12px; font-size: 12px; border-color: var(--fl-c); color: var(--fl-c); display: inline-flex;">📅 Open in Google Calendar App (Mobile)</a>${trail}`;
+      let targetUrl = 'https://calendar.google.com/calendar/r';
+      if (dateStr) {
+        const [y, mo, d] = dateStr.split('-');
+        targetUrl = `https://calendar.google.com/calendar/r/day/${y}/${mo}/${d}`;
+      }
+      return `<br><br><a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="btn ghost" style="padding: 8px 12px; font-size: 12px; border-color: var(--fl-c); color: var(--fl-c); display: inline-flex;">📅 Open in Google Calendar</a>${trail}`;
     }
     
     // Format the Gmail link for desktop
@@ -817,7 +822,8 @@ function eventCard(it, n) {
   let desc = '';
   if (it.desc) {
     const long = it.desc.length > 160 || it.desc.split('\n').length > 3;
-    desc = `<div class="ev-desc${long ? ' clamp' : ''}">${linkify(it.desc)}</div>` + (long ? `<button type="button" class="more">Show more</button>` : '');
+    // We now pass S.selected into linkify so it can build the exact URL
+    desc = `<div class="ev-desc${long ? ' clamp' : ''}">${linkify(it.desc, S.selected)}</div>` + (long ? `<button type="button" class="more">Show more</button>` : '');
   }
   return `<article class="ev ${it.kind}" style="--n:${n}"><div class="ev-ic" aria-hidden="true">${k.icon}</div>` +
          `<div class="ev-body"><div class="ev-title">${esc(it.title)}</div><div class="ev-tag">${k.label}</div>${desc}</div></article>`;
