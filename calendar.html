@@ -2,283 +2,545 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pitaka Smart Calendar</title>
 <link rel="icon" type="image/x-icon" href="calen-favicon.ico">
+
+<!-- Apply saved theme before first paint so the splash never flashes the wrong colours -->
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem('pitaka-theme');
+    var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) { document.documentElement.dataset.theme = 'light'; }
+})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 :root {
+  color-scheme: light;
   --bg: #eef2f1;
   --card: #ffffff;
   --text: #10231f;
   --text-2: #4b5f5a;
-  --text-3: #8a9c97;
+  --text-3: #71847e;
   --border: #dce4e2;
   --key: #f2f5f4;
   --key-hover: #e6ecea;
   --accent: #0ea5e9;
-  --ph-bg: #dbeafe; --ph-txt: #1e3a8a;
-  --sa-bg: #dcfce7; --sa-txt: #14532d;
   --personal: #ec4899;
+  --danger: #e11d48;
+  /* Calendar colour coding: PH = royal blue, SA = green, Personal = pink.
+     bg = tinted fill, txt = text on that fill, c = dots/markers, tag = small label text */
+  --ph-bg: #dbe4ff; --ph-txt: #1b2f8a; --ph-c: #3b5bdb; --ph-tag: #2f4bc4;
+  --sa-bg: #d3f5df; --sa-txt: #0f4a27; --sa-c: #16a34a; --sa-tag: #157a3c;
+  --pe-bg: #fbcfe8; --pe-txt: #831843; --pe-c: #db2777; --pe-tag: #be185d;
   --shadow: 0 1px 2px rgba(16,35,31,.06), 0 8px 24px -12px rgba(16,35,31,.18);
-  --modal-bg: rgba(16, 35, 31, 0.6);
-  --font: 'Sora', system-ui, sans-serif;
+  --modal-bg: rgba(16, 35, 31, 0.55);
+  --font: 'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --fl-bg: #fef3c7; --fl-txt: #92400e; --fl-c: #f59e0b; --fl-tag: #d97706;
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0c1614;
   --card: #142220;
   --text: #e6f0ed;
   --text-2: #a3b7b1;
-  --text-3: #6b807a;
+  --text-3: #7f948e;
   --border: #243633;
   --key: #1b2c29;
   --key-hover: #243836;
-  --ph-bg: #1e40af; --ph-txt: #dbeafe;
-  --sa-bg: #166534; --sa-txt: #dcfce7;
-  --modal-bg: rgba(0, 0, 0, 0.8);
+  --ph-bg: #1e2f6e; --ph-txt: #dbe4ff; --ph-c: #7c96ff; --ph-tag: #9db2ff;
+  --sa-bg: #124a2a; --sa-txt: #d3f5df; --sa-c: #4ade80; --sa-tag: #6ee7a0;
+  --pe-bg: #5b1d40; --pe-txt: #fbd5e8; --pe-c: #f472b6; --pe-tag: #f9a8d4;
+  --modal-bg: rgba(0, 0, 0, 0.75);
   --shadow: 0 8px 24px -12px rgba(0,0,0,.6);
+  --fl-bg: #451a03; --fl-txt: #fde68a; --fl-c: #fbbf24; --fl-tag: #fcd34d;
 }
 
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
 body {
-  padding: 20px; font-family: var(--font); background: var(--bg); color: var(--text);
-  display: flex; justify-content: center;
+  min-height: 100%; padding: 20px; font-family: var(--font); background: var(--bg); color: var(--text);
+  display: flex; justify-content: center; font-variant-numeric: tabular-nums;
 }
+body.booting, body.locked { overflow: hidden; }
 button, input, textarea { font-family: inherit; color: inherit; }
+button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
 
 .app { width: 100%; max-width: 1100px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); padding: 20px; }
+.side { display: flex; flex-direction: column; gap: 20px; }
 
-/* ── HEADER ── */
-.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+/* ───────────── SPLASH ───────────── */
+.splash {
+  position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  transition: opacity .5s ease, transform .5s var(--ease);
+}
+.splash.leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.splash svg { width: 104px; height: 104px; overflow: visible; }
+.sp-body { fill: var(--card); stroke: var(--border); stroke-width: 2; }
+.sp-head { fill: var(--accent); }
+.sp-ring { fill: var(--text); }
+.sp-cell { fill: var(--border); transform-box: fill-box; transform-origin: center; opacity: 0;
+  animation: cellIn .45s var(--ease) calc(var(--i) * 90ms + 150ms) both,
+             cellWave 1.7s ease-in-out calc(var(--i) * 90ms + 900ms) infinite; }
+.sp-cell.ev { fill: var(--personal);
+  animation: cellIn .45s var(--ease) calc(var(--i) * 90ms + 150ms) both,
+             cellPulse 1.7s ease-in-out calc(var(--i) * 90ms + 900ms) infinite; }
+@keyframes cellIn { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: scale(1); } }
+@keyframes cellWave { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.82); } }
+@keyframes cellPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.22); } }
+.sp-title { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sp-progress { width: min(260px, 70vw); }
+.sp-track { height: 4px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.sp-fill { height: 100%; width: 100%; background: var(--accent); border-radius: 4px; transform-origin: left; transform: scaleX(0); }
+.sp-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 12.5px; color: var(--text-3); }
+.sp-row b { font-weight: 600; color: var(--text-2); }
+
+/* ───────────── HEADER / CONTROLS ───────────── */
+.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .head h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--accent); }
 .head-actions { display: flex; gap: 8px; }
 .icon-btn {
   border: 1px solid var(--border); background: var(--key); border-radius: 10px;
-  width: 38px; height: 38px; cursor: pointer; font-size: 16px;
-  display: grid; place-items: center; transition: background .15s;
+  width: 38px; height: 38px; font-size: 16px; padding: 0;
+  display: grid; place-items: center; transition: background .15s, border-color .15s; text-decoration: none;
 }
 .icon-btn:hover { background: var(--key-hover); }
-.icon-btn.spin { animation: spin .7s linear; }
+.icon-btn.sm { width: 32px; height: 32px; border-radius: 9px; }
+.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn .spin-ic { display: inline-block; }
+.icon-btn.spin .spin-ic { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── CALENDAR GRID (LEFT) ── */
-.cal-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.cal-controls h3 { margin: 0; font-size: 16px; font-weight: 600; }
-.legend { display: flex; gap: 10px; font-size: 11px; margin-bottom: 15px; flex-wrap: wrap; font-weight: 600; }
-.legend span { padding: 4px 8px; border-radius: 6px; }
-.l-ph { background: var(--ph-bg); color: var(--ph-txt); }
-.l-sa { background: var(--sa-bg); color: var(--sa-txt); }
-.l-per { border: 1px solid var(--personal); color: var(--personal); }
+.cal-controls { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.cal-controls h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.cal-controls .right { display: flex; align-items: center; gap: 6px; }
+.today-btn {
+  height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--key);
+  font-size: 12.5px; font-weight: 600; transition: background .15s;
+}
+.today-btn:hover { background: var(--key-hover); }
 
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
-.cal-header { font-size: 12px; font-weight: 600; color: var(--text-3); padding-bottom: 8px; }
+.legend { display: flex; gap: 8px; font-size: 11.5px; margin-bottom: 14px; flex-wrap: wrap; font-weight: 600; color: var(--text-2); }
+.legend .lg { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--key); }
+.legend .lg.ph { background: var(--ph-bg); color: var(--ph-txt); }
+.legend .lg.sa { background: var(--sa-bg); color: var(--sa-txt); }
+.legend .lg.personal { background: var(--pe-bg); color: var(--pe-txt); }
+
+.banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 14px; padding: 10px 12px; border-radius: 12px; font-size: 12.5px; font-weight: 500;
+  background: color-mix(in srgb, var(--danger) 10%, var(--card)); color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.banner button { border: 0; background: var(--danger); color: #fff; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 12px; }
+
+/* sync indicator (slim bar on top of the card while refreshing) */
+.cal-card { position: relative; overflow: hidden; }
+.cal-card::before {
+  content: ""; position: absolute; top: 0; left: 0; height: 3px; width: 35%; background: var(--accent);
+  border-radius: 3px; opacity: 0; transform: translateX(-100%);
+}
+.cal-card.syncing::before { opacity: 1; animation: sync 1.1s ease-in-out infinite; }
+.cal-card.syncing .calendar-grid { opacity: .6; }
+@keyframes sync { to { transform: translateX(290%); } }
+
+.dot.flight { background: var(--accent); }
+.ev.flight .ev-ic { background: color-mix(in srgb, var(--accent) 18%, var(--card)); }
+.ev.flight .ev-tag { color: var(--accent); }
+
+/* ───────────── CALENDAR GRID ───────────── */
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; text-align: center; transition: opacity .2s; touch-action: pan-y; }
+.calendar-grid.slide-next { animation: slideNext .26s var(--ease); }
+.calendar-grid.slide-prev { animation: slidePrev .26s var(--ease); }
+@keyframes slideNext { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes slidePrev { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+.cal-header { font-size: 12px; font-weight: 600; color: var(--text-3); padding-bottom: 6px; }
 .cal-day {
-  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-  border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer;
-  border: 1px solid var(--border); background: var(--key); position: relative;
-  transition: all .15s;
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 12px; font-size: 14px; font-weight: 500; padding: 0; position: relative; overflow: hidden;
+  border: 1px solid var(--border); background: var(--key);
+  transition: border-color .15s, background .15s, transform .15s;
 }
-.cal-day:hover { border-color: var(--accent); transform: scale(1.05); }
-.cal-day.empty { background: transparent; border: none; cursor: default; }
-.cal-day.empty:hover { transform: none; }
-.cal-day.today { border: 2px solid var(--accent); font-weight: 700; }
-.cal-day.selected { border: 2px solid var(--text); }
+.cal-day:hover { border-color: var(--accent); }
+.cal-day:active { transform: scale(.96); }
+.cal-day.empty { visibility: hidden; pointer-events: none; border: 0; background: none; }
+.cal-day .dots { display: flex; gap: 3px; height: 6px; align-items: center; }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.dot.ph { background: var(--ph-c); }
+.dot.sa { background: var(--sa-c); }
+.dot.personal { background: var(--pe-c); }
 
-.cal-day.ph-holiday { background: var(--ph-bg); color: var(--ph-txt); border-color: transparent; }
-.cal-day.sa-holiday { background: var(--sa-bg); color: var(--sa-txt); border-color: transparent; }
-.cal-day.both-holiday { background: linear-gradient(135deg, var(--ph-bg), var(--sa-bg)); border-color: transparent; }
-.cal-day.has-personal { border: 2px solid var(--personal); }
-
-.cal-indicator {
-  position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
-  width: 5px; height: 5px; background: var(--personal); border-radius: 50%;
+.cal-day.ph-holiday { background: var(--ph-bg); color: var(--ph-txt); border-color: color-mix(in srgb, var(--ph-c) 40%, transparent); }
+.cal-day.sa-holiday { background: var(--sa-bg); color: var(--sa-txt); border-color: color-mix(in srgb, var(--sa-c) 40%, transparent); }
+/* PH + SA on the same day: two colours split by a thin diagonal gap */
+.cal-day.both-holiday { background: linear-gradient(135deg, var(--ph-bg) 0 47%, var(--card) 47% 53%, var(--sa-bg) 53% 100%); color: var(--text); border-color: var(--border); }
+/* Personal-only day gets a pink tint */
+.cal-day.personal-day { background: var(--pe-bg); color: var(--pe-txt); border-color: var(--pe-c); font-weight: 600; }
+/* Any day with a personal entry gets a pink corner tab, so it still shows on top of a holiday colour */
+.cal-day.has-personal::after {
+  content: ""; position: absolute; top: 0; right: 0; width: 22px; height: 22px; pointer-events: none;
+  background: linear-gradient(225deg, var(--pe-c) 50%, transparent 50%);
+}
+/* Selected / today keep a visible personal cue */
+.cal-day.selected.has-personal { box-shadow: inset 0 0 0 3px var(--pe-c); }
+.cal-day.selected.has-personal::after { background: linear-gradient(225deg, var(--card) 50%, transparent 50%); }
+.cal-day.today.has-personal:not(.selected) { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-day.selected .dot { box-shadow: 0 0 0 1.5px var(--card); }
+.cal-day.today { box-shadow: inset 0 0 0 2px var(--accent); font-weight: 700; }
+.cal-day.selected { background: var(--text); color: var(--card); border-color: var(--text); font-weight: 700; }
+.cal-day.pop { animation: pop .7s var(--ease); }
+@keyframes pop {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--personal); }
+  35% { transform: scale(1.14); }
+  100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; }
 }
 
-/* ── SIDE PANEL (RIGHT) ── */
-.side-panel { display: flex; flex-direction: column; gap: 20px; height: 100%; min-height: 500px; }
-.day-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-.section-title { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 0 0 10px 0; }
-.log-scroll { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.day-events-container { min-height: 120px; }
-.month-events-container { flex: 1; display: flex; flex-direction: column; min-height: 200px; border-top: 1px solid var(--border); padding-top: 15px; }
+/* Calendar cell highlight for flights */
+.cal-day.flight-day { background: var(--fl-bg); color: var(--fl-txt); border-color: color-mix(in srgb, var(--fl-c) 40%, transparent); font-weight: 600; }
+.cal-day.has-flight::after {
+  content: ""; position: absolute; top: 0; right: 0; width: 22px; height: 22px; pointer-events: none;
+  background: linear-gradient(225deg, var(--fl-c) 50%, transparent 50%);
+}
+.cal-day.selected.has-flight { box-shadow: inset 0 0 0 3px var(--fl-c); }
+.cal-day.selected.has-flight::after { background: linear-gradient(225deg, var(--card) 50%, transparent 50%); }
 
-.event-item { font-size: 13px; padding: 10px; border-radius: 8px; background: var(--key); }
-.event-item.ph { border-left: 4px solid #eab308; }
-.event-item.sa { border-left: 4px solid #f97316; }
-.event-item.personal { border-left: 4px solid var(--personal); }
+/* Event card container & dots for flights */
+.dot.flight { background: var(--fl-c); }
+.ev.flight { background: color-mix(in srgb, var(--fl-bg) 55%, var(--card)); box-shadow: inset 4px 0 0 var(--fl-c); }
+.ev.flight .ev-ic { background: var(--fl-bg); color: var(--fl-txt); }
+.ev.flight .ev-tag { color: var(--fl-tag); }
 
-/* ── FLOATING ACTION BUTTON (FAB) ── */
+/* ───────────── DAY PANEL ───────────── */
+.day-panel { padding: 18px; }
+.sheet-grab, .sheet-close, .sheet-backdrop { display: none; }
+.day-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.day-tile {
+  width: 52px; height: 52px; border-radius: 15px; flex: none; display: grid; place-items: center;
+  font-size: 22px; font-weight: 700; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+}
+.day-tile.is-today { background: var(--accent); color: #fff; }
+.day-meta { flex: 1; min-width: 0; }
+.day-week { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.day-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+.chip { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--key); color: var(--text-2); }
+.chip.now { background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--accent); }
+.day-nav { display: flex; gap: 6px; }
+
+.day-body { display: flex; flex-direction: column; gap: 8px; }
+.ev { display: flex; gap: 12px; padding: 12px; border-radius: 14px; background: var(--key); animation: evIn .25s var(--ease) both; animation-delay: calc(var(--n, 0) * 40ms); }
+@keyframes evIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.ev-ic { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 16px; }
+.ev.ph { background: color-mix(in srgb, var(--ph-bg) 55%, var(--card)); box-shadow: inset 4px 0 0 var(--ph-c); }
+.ev.sa { background: color-mix(in srgb, var(--sa-bg) 55%, var(--card)); box-shadow: inset 4px 0 0 var(--sa-c); }
+.ev.personal { background: color-mix(in srgb, var(--pe-bg) 55%, var(--card)); box-shadow: inset 4px 0 0 var(--pe-c); }
+.ev.ph .ev-ic { background: var(--ph-bg); }
+.ev.sa .ev-ic { background: var(--sa-bg); }
+.ev.personal .ev-ic { background: var(--pe-bg); }
+.ev-body { min-width: 0; flex: 1; }
+.ev-title { font-size: 14px; font-weight: 600; line-height: 1.35; word-break: break-word; }
+.ev-tag { font-size: 11.5px; font-weight: 600; margin-top: 2px; }
+.ev.ph .ev-tag { color: var(--ph-tag); }
+.ev.sa .ev-tag { color: var(--sa-tag); }
+.ev.personal .ev-tag { color: var(--pe-tag); }
+.ev-desc { margin-top: 8px; font-size: 12.5px; line-height: 1.55; color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+.ev-desc.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ev-desc a { color: var(--accent); text-decoration: underline; font-weight: 500; }
+.more { border: 0; background: none; padding: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
+
+.empty { text-align: center; padding: 22px 10px 8px; color: var(--text-3); font-size: 13px; }
+.empty p { margin: 0 0 14px; line-height: 1.5; }
+.empty-ic { font-size: 26px; margin-bottom: 6px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;
+  padding: 12px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; border: 1px solid transparent; transition: opacity .15s, background .15s;
+}
+.btn.primary { background: var(--personal); color: #fff; }
+.btn.primary:hover { opacity: .92; }
+.btn.primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn.ghost { background: var(--key); border-color: var(--border); }
+.btn.ghost:hover { background: var(--key-hover); }
+.add-inline { width: 100%; margin-top: 4px; }
+
+/* ───────────── MONTH OVERVIEW ───────────── */
+.month-card h4 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--text-2); display: flex; align-items: center; gap: 8px; }
+.month-card h4 .chip { font-weight: 600; }
+.month-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding-right: 2px; }
+.mrow {
+  display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 100%;
+  padding: 8px 10px; border-radius: 12px; border: 1px solid transparent; background: var(--key); transition: border-color .15s;
+}
+.mrow:hover { border-color: var(--accent); }
+.mrow.is-selected { border-color: var(--text); }
+.mrow.past { opacity: .55; }
+.mdate { width: 34px; flex: none; text-align: center; line-height: 1.1; }
+.mdate b { display: block; font-size: 16px; font-weight: 700; }
+.mdate small { font-size: 10.5px; color: var(--text-3); font-weight: 600; }
+.mlist { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 2px; }
+.mitem { display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.35; }
+.mitem span { min-width: 0; overflow-wrap: anywhere; }
+.month-empty { font-size: 13px; color: var(--text-3); padding: 6px 2px; }
+
+/* ───────────── FAB ───────────── */
 .fab {
-  position: fixed; bottom: 30px; right: 30px;
-  width: 56px; height: 56px; border-radius: 50%;
-  background: var(--personal); color: white; border: none;
-  font-size: 28px; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4); cursor: pointer;
-  transition: transform 0.2s, background 0.2s; z-index: 90;
+  position: fixed; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); right: 28px; z-index: 85;
+  height: 56px; min-width: 56px; padding: 0 20px 0 18px; border-radius: 28px;
+  background: var(--personal); color: #fff; border: none; font-weight: 600; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 6px 18px rgba(236, 72, 153, .38); transition: transform .2s var(--ease), opacity .2s;
 }
-.fab:hover { transform: scale(1.1); background: #db2777; }
-.fab:active { transform: scale(0.95); }
+.fab svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2.6; stroke-linecap: round; }
+.fab:hover { transform: translateY(-2px); }
+.fab:active { transform: scale(.96); }
+body.sheet-open .fab, body.locked .fab { opacity: 0; pointer-events: none; }
 
-/* ── MODAL ── */
+/* ───────────── MODAL (Add event) ───────────── */
 .modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: var(--modal-bg); display: flex; align-items: center; justify-content: center;
-  z-index: 100; opacity: 1; transition: opacity 0.2s; backdrop-filter: blur(4px);
+  position: fixed; inset: 0; z-index: 100; background: var(--modal-bg); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  opacity: 1; visibility: visible; transition: opacity .2s;
 }
-.modal-overlay.hidden { opacity: 0; pointer-events: none; }
+.modal-overlay.hidden { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
 .modal-card {
-  background: var(--card); padding: 25px; border-radius: 20px;
-  width: 90%; max-width: 400px; box-shadow: var(--shadow);
-  transform: translateY(0); transition: transform 0.3s; position: relative;
+  background: var(--card); border: 1px solid var(--border); border-radius: 22px; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto;
+  padding: 22px; box-shadow: var(--shadow); transition: transform .3s var(--ease);
 }
-.modal-overlay.hidden .modal-card { transform: translateY(20px); }
-.close-modal {
-  position: absolute; top: 15px; right: 20px; font-size: 24px;
-  cursor: pointer; color: var(--text-3); transition: color 0.2s;
-}
-.close-modal:hover { color: var(--danger); }
+.modal-overlay.hidden .modal-card { transform: translateY(18px) scale(.98); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.modal-head h3 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
 
-.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px; }
-.form-group label { font-size: 12px; font-weight: 600; color: var(--text-2); }
-.form-group input, .form-group textarea {
-  width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--key); color: var(--text); font-size: 14px; outline: none; transition: border .15s;
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field > label, .field-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); display: flex; justify-content: space-between; }
+.field input, .field textarea {
+  width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--key); font-size: 15px; outline: none; transition: border-color .15s, box-shadow .15s;
 }
-.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
-.btn-submit {
-  width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--personal);
-  color: white; font-weight: 600; font-size: 14px; cursor: pointer; transition: opacity .15s;
+.field textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+.field input:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.field.invalid input { border-color: var(--danger); animation: shake .3s; }
+.field .err { font-size: 12px; color: var(--danger); font-weight: 500; min-height: 0; }
+.field .hint { font-size: 12px; color: var(--text-3); }
+.count { font-weight: 500; color: var(--text-3); }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips button {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--key);
+  font-size: 12.5px; font-weight: 600; transition: background .15s, border-color .15s;
 }
-.btn-submit:hover { opacity: 0.9; }
-.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.chips button:hover { background: var(--key-hover); }
+.chips button.active { background: color-mix(in srgb, var(--personal) 14%, var(--card)); border-color: var(--personal); color: var(--personal); }
+
+.sync-note { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text-3); margin: -2px 0 16px; }
+.form-actions { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; }
+.spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: spin .7s linear infinite; }
 
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0;
-  background: var(--text); color: var(--card); padding: 12px 20px; border-radius: 10px;
-  font-size: 13px; font-weight: 600; pointer-events: none; transition: all .2s; z-index: 1000;
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); opacity: 0;
+  background: var(--text); color: var(--card); padding: 12px 20px; border-radius: 12px; max-width: 90vw; text-align: center;
+  font-size: 13px; font-weight: 600; pointer-events: none; transition: all .25s var(--ease); z-index: 1000;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ───────────── MOBILE ───────────── */
 @media (max-width: 800px) {
-  body { padding: 12px; }
-  .app { grid-template-columns: 1fr; }
-  .side-panel { min-height: auto; }
-  .fab { bottom: 20px; right: 20px; }
+  body { padding: 12px 12px calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .app { grid-template-columns: 1fr; gap: 16px; }
+  .side { gap: 16px; }
+  .card { padding: 16px; }
+  .fab { right: 18px; padding: 0; width: 56px; }
+  .fab span { display: none; }
+
+  .sheet-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 80; background: var(--modal-bg);
+    opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s;
+  }
+  .sheet-backdrop.show { opacity: 1; visibility: visible; transition: opacity .25s; }
+
+  .day-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 95; margin: 0;
+    border-radius: 24px 24px 0 0; border-bottom: 0; max-height: 78vh; overflow-y: auto;
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(105%); visibility: hidden;
+    transition: transform .34s var(--ease), visibility 0s .34s;
+  }
+  .day-panel.open { transform: none; visibility: visible; transition: transform .34s var(--ease); }
+  .day-panel.dragging { transition: none; }
+  .sheet-grab { display: flex; justify-content: center; padding: 6px 0 12px; touch-action: none; }
+  .sheet-grab span { width: 40px; height: 4px; border-radius: 4px; background: var(--border); }
+  .sheet-close { display: grid; }
+  .day-head { touch-action: none; }
+
+  /* Add event becomes a bottom sheet too */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-card { max-width: none; border-radius: 24px 24px 0 0; border-bottom: 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .modal-overlay.hidden .modal-card { transform: translateY(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 </style>
 </head>
-<body>
+<body class="booting">
+
+<!-- ═════════ STARTUP SPLASH ═════════ -->
+<div class="splash" id="splash" role="status" aria-live="polite">
+  <svg viewBox="0 0 96 96" aria-hidden="true">
+    <rect class="sp-body" x="10" y="16" width="76" height="72" rx="16"/>
+    <path class="sp-head" d="M10 32a16 16 0 0 1 16-16h44a16 16 0 0 1 16 16v6H10z"/>
+    <rect class="sp-ring" x="29" y="8" width="7" height="17" rx="3.5"/>
+    <rect class="sp-ring" x="60" y="8" width="7" height="17" rx="3.5"/>
+    <rect class="sp-cell" style="--i:0" x="21" y="48" width="13" height="13" rx="4"/>
+    <rect class="sp-cell" style="--i:1" x="41.5" y="48" width="13" height="13" rx="4"/>
+    <rect class="sp-cell" style="--i:2" x="62" y="48" width="13" height="13" rx="4"/>
+    <rect class="sp-cell" style="--i:3" x="21" y="67" width="13" height="13" rx="4"/>
+    <rect class="sp-cell ev" style="--i:4" x="41.5" y="67" width="13" height="13" rx="4"/>
+    <rect class="sp-cell" style="--i:5" x="62" y="67" width="13" height="13" rx="4"/>
+  </svg>
+  <div class="sp-title">Pitaka Calendar</div>
+  <div class="sp-progress">
+    <div class="sp-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="sp-fill" id="loadingBar"></div>
+    </div>
+    <div class="sp-row"><span id="loadingText">Starting up…</span><b id="loadingPercent">0%</b></div>
+  </div>
+</div>
 
 <div class="app">
 
-<!-- LOADING OVERLAY -->
-<div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s ease;">
-  <div style="font-size: 45px; margin-bottom: 15px; animation: bounce 1s infinite alternate;">📅</div>
-  <div style="font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 12px; font-family: var(--font);" id="loadingPercent">0%</div>
-  <div style="width: 220px; height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
-    <div id="loadingBar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.2s ease;"></div>
-  </div>
-  <div style="font-size: 13px; color: var(--text-3); font-weight: 500;" id="loadingText">Connecting to secure server...</div>
-</div>
-
-<style>
-  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
-</style>
-  
-  <!-- LEFT COLUMN: CALENDAR GRID -->
-  <section class="card">
+  <!-- LEFT: CALENDAR -->
+  <section class="card cal-card" id="calCard">
     <div class="head">
       <h2>Pitaka Calendar</h2>
       <div class="head-actions">
-        <a href="mobile.html" style="text-decoration: none;">
-          <button class="icon-btn" title="Back to Dashboard">🏠</button>
-        </a>
-        <button class="icon-btn" id="themeBtn" title="Toggle theme">🌓</button>
-        <button class="icon-btn" id="refreshBtn" title="Sync Google Calendar">🔄</button>
+        <a href="mobile.html" class="icon-btn" title="Back to dashboard" aria-label="Back to dashboard">🏠</a>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+        <button class="icon-btn" id="refreshBtn" title="Sync Google Calendar" aria-label="Sync Google Calendar"><span class="spin-ic">🔄</span></button>
       </div>
     </div>
 
     <div class="cal-controls">
-      <button class="icon-btn" onclick="changeMonth(-1)">&#9664;</button>
-      <h3 id="monthDisplay">Loading...</h3>
-      <button class="icon-btn" onclick="changeMonth(1)">&#9654;</button>
+      <h3 id="monthDisplay" aria-live="polite">&nbsp;</h3>
+      <div class="right">
+        <button class="today-btn" id="todayBtn">Today</button>
+        <button class="icon-btn sm" id="prevMonth" aria-label="Previous month"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="icon-btn sm" id="nextMonth" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
     </div>
 
-    <div class="legend">
-      <span class="l-ph">🇵🇭 PH Holiday</span>
-      <span class="l-sa">🇸🇦 SA Holiday</span>
-      <span class="l-per">📌 Personal</span>
+<div class="legend">
+      <span class="lg ph"><i class="dot ph"></i>🇵🇭 PH holiday</span>
+      <span class="lg sa"><i class="dot sa"></i>🇸🇦 SA holiday</span>
+      <span class="lg flight"><i class="dot flight"></i>✈️ Flight</span>
+      <span class="lg personal"><i class="dot personal"></i>📌 Personal</span>
+    </div>
+
+    <div class="banner" id="banner" hidden>
+      <span id="bannerText"></span>
+      <button type="button" id="bannerRetry">Retry</button>
     </div>
 
     <div id="calendarGrid" class="calendar-grid"></div>
   </section>
 
-  <!-- RIGHT COLUMN: OVERVIEW & DAY DETAILS -->
-  <section class="card side-panel">
-    
-    <!-- Selected Day Events -->
-    <div class="day-events-container">
-      <div class="day-title" id="dayTitle">Select a day</div>
-      <div class="log-scroll" id="dayEvents" style="max-height: 250px;">
-        <span style="color: var(--text-3); font-size: 13px;">Click a date on the calendar to view details.</span>
+  <!-- RIGHT: DAY DETAILS + MONTH OVERVIEW -->
+  <aside class="side">
+    <section class="card day-panel" id="dayPanel" aria-label="Day details">
+      <div class="sheet-grab" id="sheetGrab"><span></span></div>
+      <div class="day-head" id="dayHead">
+        <div class="day-tile" id="dayTile"><span id="dayNum">1</span></div>
+        <div class="day-meta">
+          <div class="day-week" id="dayWeek"></div>
+          <div class="day-sub"><span id="dayMonth"></span><span class="chip" id="dayRel"></span></div>
+        </div>
+        <div class="day-nav">
+          <button class="icon-btn sm" id="dayPrev" aria-label="Previous day"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <button class="icon-btn sm" id="dayNext" aria-label="Next day"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+          <button class="icon-btn sm sheet-close" id="sheetClose" aria-label="Close details"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
       </div>
-    </div>
+      <div class="day-body" id="dayEvents" aria-live="polite"></div>
+    </section>
 
-    <!-- Monthly Overview -->
-    <div class="month-events-container">
-      <h4 class="section-title">📅 This Month's Overview</h4>
-      <div id="monthlyEvents" class="log-scroll"></div>
-    </div>
-
-  </section>
-
+    <section class="card month-card">
+      <h4><span id="monthTitle">This month</span><span class="chip" id="monthCount"></span></h4>
+      <div class="month-list" id="monthlyEvents"></div>
+    </section>
+  </aside>
 </div>
 
-<!-- FLOATING ACTION BUTTON -->
-<button class="fab" id="fabBtn" title="Add Note/Event">+</button>
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
 
-<!-- ADD NOTE MODAL -->
-<div id="noteModal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <span class="close-modal" id="closeModalBtn">&times;</span>
-    <h3 style="margin-top: 0; color: var(--personal); font-size: 18px;">Add Event</h3>
-    <form id="noteForm">
-      <input type="hidden" id="selectedDate">
-      
-      <div class="form-group">
-        <label>Selected Date</label>
-        <input type="text" id="displaySelectedDate" readonly style="background: var(--bg); color: var(--text-2); font-weight: 600; cursor: not-allowed;">
+<!-- FLOATING ADD BUTTON -->
+<button class="fab" id="fabBtn" title="Add event (N)" aria-label="Add event">
+  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Add event</span>
+</button>
+
+<!-- ADD EVENT -->
+<div id="noteModal" class="modal-overlay hidden" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h3 id="modalTitle">New event</h3>
+      <button type="button" class="icon-btn sm" id="closeModalBtn" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+
+    <form id="noteForm" novalidate>
+      <div class="field" id="fieldTitle">
+        <label for="noteTitle">Title</label>
+        <input type="text" id="noteTitle" maxlength="80" autocomplete="off" placeholder="e.g. Doctor appointment, Pay bills">
+        <div class="err" id="titleErr" role="alert"></div>
       </div>
 
-      <div class="form-group">
-        <label>Title</label>
-        <input type="text" id="noteTitle" required placeholder="e.g., Doctor Appointment, Pay Bills">
+      <div class="field" id="fieldDate">
+        <label for="eventDate">Date</label>
+        <input type="date" id="eventDate">
+        <div class="chips" id="dateChips">
+          <button type="button" data-offset="0">Today</button>
+          <button type="button" data-offset="1">Tomorrow</button>
+          <button type="button" data-offset="7">Next week</button>
+        </div>
+        <div class="hint" id="dateReadout"></div>
       </div>
-      
-      <div class="form-group">
-        <label>Description (Optional)</label>
-        <textarea id="noteDesc" rows="3" placeholder="Any extra details..."></textarea>
+
+      <div class="field">
+        <label for="noteDesc"><span>Details (optional)</span><span class="count" id="descCount">0/500</span></label>
+        <textarea id="noteDesc" maxlength="500" rows="3" placeholder="Add a note, place or link…"></textarea>
       </div>
-      
-      <button type="submit" class="btn-submit" id="submitBtn">Save & Sync to Google</button>
+
+      <div class="sync-note">☁️ <span>Saved to Pitaka and added to your Google Calendar.</span></div>
+
+      <div class="form-actions">
+        <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn primary" id="submitBtn">Save event</button>
+      </div>
     </form>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 // ==========================================
-// 1. FIREBASE INITIALIZATION
+// 1. FIREBASE
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
@@ -293,287 +555,555 @@ if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 const auth = firebase.auth();
 const db = firebase.database();
 
+const CALENDAR_API_URL = "https://script.google.com/macros/s/AKfycbz5bRtVHyNUh0BUZ5M-_yLn3ZqFIfNpojdD_2cBy_ikQhISryN0WIYeVTa1Vr1wcDDx4Q/exec";
+
 // ==========================================
-// 2. GLOBALS & THEME
+// 2. HELPERS
 // ==========================================
 const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const isMobile = () => window.matchMedia('(max-width: 800px)').matches;
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
 }
-function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 
-(function () {
-  const saved = store('pitaka-theme');
-  const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-})();
+// Dates are handled as local "YYYY-MM-DD" strings (never parsed as UTC).
+const pad = n => String(n).padStart(2, '0');
+const toStr = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+const dateToStr = dt => toStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayStr = () => dateToStr(new Date());
+const fmtLong = s => parse(s).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+function relLabel(s) {
+  const diff = Math.round((parse(s) - parse(todayStr())) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  return diff > 0 ? `In ${diff} days` : `${-diff} days ago`;
+}
+function linkify(text) {
+  return esc(text).replace(/(https?:\/\/[^\s<]+)/g, m => {
+    const trail = (m.match(/[.,:!?)\]]+$/) || [''])[0];
+    const url = m.slice(0, m.length - trail.length);
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${trail}`;
+  });
+}
+
+// Theme
 $('themeBtn').addEventListener('click', () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next; store('pitaka-theme', next);
 });
 
 // ==========================================
-// 3. CALENDAR LOGIC & LOADING ANIMATION
+// 3. STARTUP LOADER (progress follows real work)
 // ==========================================
-const CALENDAR_API_URL = "https://script.google.com/macros/s/AKfycbz5bRtVHyNUh0BUZ5M-_yLn3ZqFIfNpojdD_2cBy_ikQhISryN0WIYeVTa1Vr1wcDDx4Q/exec";
-let calHolidays = [];
-let calPersonalNotes = [];
-let currentCalDate = new Date(); 
-let activeSelectedDateStr = "";
+const Loader = (() => {
+  const el = $('splash'), bar = $('loadingBar'), pctEl = $('loadingPercent'), txt = $('loadingText');
+  const track = bar.parentElement;
+  const MIN_MS = 1400;                       // long enough for the animation to read, short enough not to nag
+  let target = 0, shown = 0, done = false, hidden = false;
+  const t0 = performance.now();
 
-// --- LOADING ANIMATION SYSTEM ---
-let loadProgress = 0;
-let loadInterval;
-
-function updateLoader(pct, text) {
-  loadProgress = pct;
-  const pctEl = $('loadingPercent');
-  const barEl = $('loadingBar');
-  const textEl = $('loadingText');
-  
-  if (pctEl) pctEl.innerText = pct + '%';
-  if (barEl) barEl.style.width = pct + '%';
-  if (textEl && text) textEl.innerText = text;
-}
-
-function startLoadingAnim() {
-  $('loadingOverlay').style.display = 'flex';$('loadingOverlay').style.opacity = '1';
-  updateLoader(0, "Connecting to secure server...");
-  
-  loadInterval = setInterval(() => {
-    if (loadProgress < 85) {
-      updateLoader(loadProgress + Math.floor(Math.random() * 6) + 1);
-    }
-  }, 100);
-}
-
-function finishLoading() {
-  clearInterval(loadInterval);
-  updateLoader(100, "Complete!");
-  
-  setTimeout(() => {
-    const overlay = $('loadingOverlay');
-    if (overlay) {
-      overlay.style.opacity = '0'; // Fade out
-      setTimeout(() => {
-        overlay.style.display = 'none';
-        
-        // Push history state ONLY after the UI is fully loaded and revealed
-        window.history.pushState({ page: 'calendar' }, "", window.location.href);
-      }, 400); // Wait for CSS transition
-    }
-  }, 300);
-}
-
-// --- MAIN CALENDAR FETCH ---
-async function fetchHolidays() {
-  $('refreshBtn').classList.add('spin');
-  startLoadingAnim();
-  updateLoader(20, "Fetching public holidays...");
-  
-  try {
-    const res = await fetch(CALENDAR_API_URL);
-    updateLoader(60, "Parsing calendar data...");
-    
-    const json = await res.json();
-    if (json.status === "success") { 
-      calHolidays = json.data; 
-      updateLoader(85, "Rendering calendar view...");
-      renderCalendar(); 
-      toast("Calendar synced with Google");
-      finishLoading();
-    }
-  } catch(e) { 
-    toast("Failed to load holidays"); 
-    finishLoading();
+  function step(pct, text) {
+    if (done || pct < target) return;
+    target = pct; if (text) txt.textContent = text;
   }
-  setTimeout(() => $('refreshBtn').classList.remove('spin'), 700);
+  function paint() {
+    const p = Math.round(shown);
+    bar.style.transform = `scaleX(${shown / 100})`;
+    pctEl.textContent = p + '%';
+    track.setAttribute('aria-valuenow', p);
+  }
+  function tick() {
+    const elapsed = performance.now() - t0;
+    const goal = done ? 100 : Math.min(target + 5, 95);       // gentle creep between real milestones
+    const timeCap = Math.min(100, (elapsed / MIN_MS) * 100);   // never finishes faster than MIN_MS
+    shown = Math.min(shown + (goal - shown) * 0.09 + 0.06, goal, timeCap);
+    paint();
+    if (done && shown >= 99.5) return hide();
+    requestAnimationFrame(tick);
+  }
+  function hide() {
+    if (hidden) return; hidden = true;
+    shown = 100; paint();
+    el.classList.add('leaving');
+    document.body.classList.remove('booting');
+    setTimeout(() => el.remove(), 650);
+  }
+  function finish() { if (done) return; txt.textContent = 'All set'; done = true; }
+  requestAnimationFrame(tick);
+  return { step, finish };
+})();
+
+// ==========================================
+// 4. STATE + DATA
+// ==========================================
+const now0 = new Date();
+const S = {
+  holidays: [], notes: [], index: new Map(),
+  viewY: now0.getFullYear(), viewM: now0.getMonth(),
+  selected: todayStr(), user: null, syncing: false, fromCache: false,
+};
+let booted = false;
+
+const KIND = {
+  ph:       { icon: '🇵🇭', label: 'Philippine holiday' },
+  sa:       { icon: '🇸🇦', label: 'Saudi holiday' },
+  flight:   { icon: '✈️', label: 'Flight' },
+  personal: { icon: '📌', label: 'Personal' },
+};
+const ORDER = { ph: 0, sa: 1, flight: 2, personal: 3 };
+const kindOf = c => (c === 'Philippines' || c === 'PH') ? 'ph' : (c === 'Saudi Arabia' || c === 'SA') ? 'sa' : (c === 'Flight') ? 'flight' : 'personal';
+
+function buildIndex() {
+  const idx = new Map();
+  const add = (date, item) => { if (!date) return; if (!idx.has(date)) idx.set(date, []); idx.get(date).push(item); };
+  // Events you add here also come back from Google; show each only once.
+  const noteKeys = new Set(S.notes.map(n => `${n.date}|${(n.title || '').trim().toLowerCase()}`));
+  S.holidays.forEach(h => {
+    const kind = kindOf(h.country);
+    if (kind === 'personal' && noteKeys.has(`${h.date}|${(h.name || '').trim().toLowerCase()}`)) return;
+    add(h.date, { kind, title: h.name || '(untitled)', desc: h.description || '' });
+  });
+  S.notes.forEach(n => add(n.date, { kind: 'personal', title: n.title || '(untitled)', desc: n.notes || '' }));
+  idx.forEach(list => list.sort((a, b) => ORDER[a.kind] - ORDER[b.kind]));
+  S.index = idx;
 }
 
-$('refreshBtn').addEventListener('click', fetchHolidays);
+// Public holidays are cached so the calendar still has them offline. Personal entries are never cached.
+const CACHE_KEY = 'pitaka-cal-holidays-v1';
+function readCache() { try { const raw = store(CACHE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function writeCache(list) { store(CACHE_KEY, JSON.stringify(list.filter(h => kindOf(h.country) !== 'personal'))); }
+
+async function loadHolidays() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const res = await fetch(CALENDAR_API_URL, { signal: ctrl.signal });
+    const json = await res.json();
+    if (json.status !== 'success' || !Array.isArray(json.data)) throw new Error('Unexpected response');
+    S.holidays = json.data; S.fromCache = false; writeCache(json.data);
+    return true;
+  } catch (e) {
+    console.error('Holiday load failed:', e);
+    const cached = readCache();
+    if (cached) { S.holidays = cached; S.fromCache = true; }
+    return false;
+  } finally { clearTimeout(timer); }
+}
+
+function showBanner(ok) {
+  const b = $('banner');
+  if (ok) { b.hidden = true; return; }
+  $('bannerText').textContent = S.fromCache
+    ? "Couldn't reach Google Calendar. Showing holidays saved on this device."
+    : "Couldn't load holidays from Google Calendar.";
+  b.hidden = false;
+}
+
+async function refresh() {
+  if (S.syncing) return;
+  S.syncing = true;
+  $('refreshBtn').classList.add('spin'); $('calCard').classList.add('syncing');
+  const ok = await loadHolidays();
+  buildIndex(); renderAll(); showBanner(ok);
+  toast(ok ? 'Calendar synced with Google' : "Couldn't sync. Check your connection and retry.");
+  $('refreshBtn').classList.remove('spin'); $('calCard').classList.remove('syncing');
+  S.syncing = false;
+}
+$('refreshBtn').addEventListener('click', refresh);
+$('bannerRetry').addEventListener('click', refresh);
+
+// Auth + live personal notes
+let resolveAuth, resolveNotes, notesRef = null;
+const authReady = new Promise(r => resolveAuth = r);
+const notesReady = new Promise(r => resolveNotes = r);
 
 auth.onAuthStateChanged(user => {
+  S.user = user;
   if (user) {
-    db.ref('calendar_notes').on('value', snap => {
-      calPersonalNotes = [];
-      snap.forEach(child => { calPersonalNotes.push({ id: child.key, ...child.val() }); });
-      renderCalendar(); 
-    });
+    if (!notesRef) {
+      notesRef = db.ref('calendar_notes');
+      notesRef.on('value', snap => {
+        const arr = [];
+        snap.forEach(child => { arr.push({ id: child.key, ...child.val() }); });
+        S.notes = arr; resolveNotes();
+        if (booted) { buildIndex(); renderAll(); }
+      }, err => { console.error(err); resolveNotes(); });
+    }
+  } else {
+    if (notesRef) { notesRef.off(); notesRef = null; }
+    S.notes = []; resolveNotes();
   }
+  resolveAuth(user);
+  if (booted) { buildIndex(); renderAll(); }
 });
 
-function changeMonth(offset) {
-  currentCalDate.setMonth(currentCalDate.getMonth() + offset);
-  renderCalendar();
-}
+// ==========================================
+// 5. RENDERING
+// ==========================================
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const monthName = (y, m) => new Date(y, m, 1).toLocaleString(undefined, { month: 'long' });
 
-function renderCalendar() {
-  const grid = $('calendarGrid');
-  const monthDisplay = $('monthDisplay');
-  const year = currentCalDate.getFullYear(), month = currentCalDate.getMonth();
-  
-  monthDisplay.innerText = currentCalDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+function renderAll(dir) { renderGrid(dir); renderDay(); renderMonth(); }
 
-  let html = '';
-  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(h => {
-    html += `<div class="cal-header">${h}</div>`;
-  });
+function renderGrid(dir) {
+  const y = S.viewY, m = S.viewM, grid = $('calendarGrid');
+  $('monthDisplay').textContent = new Date(y, m, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), t = todayStr();
+  let html = WEEKDAYS.map(h => `<div class="cal-header">${h}</div>`).join('');
+  for (let i = 0; i < first; i++) html += `<div class="cal-day empty" aria-hidden="true"></div>`;
 
-  for(let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
-
-  const formatStr = (d) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const _now = new Date();
-  const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
-  let monthlyLog = [];
-
-  for(let d = 1; d <= daysInMonth; d++) {
-    const dateStr = formatStr(d);
-    let classes = ["cal-day"];
-    if (dateStr === todayStr) classes.push("today");
-    if (dateStr === activeSelectedDateStr) classes.push("selected");
-
-    const dayHolidays = calHolidays.filter(h => h.date === dateStr);
-    const dayNotes = calPersonalNotes.filter(n => n.date === dateStr);
-    
-    const hasGoogleEntry = dayHolidays.some(h => h.country === 'Personal_Entry' || h.country === 'Personal');
-    if (dayNotes.length > 0 || hasGoogleEntry) classes.push("has-personal");
-
-    let hasPH = false, hasSA = false;
-    dayHolidays.forEach(h => {
-      let type = 'personal'; 
-      if (h.country === 'Philippines' || h.country === 'PH') { hasPH = true; type = 'ph'; } 
-      else if (h.country === 'Saudi Arabia' || h.country === 'SA') { hasSA = true; type = 'sa'; } 
-      monthlyLog.push({ date: dateStr, title: h.name, type: type, day: d });
-    });
-
-    if (hasPH && hasSA) classes.push("both-holiday");
-    else if (hasPH) classes.push("ph-holiday");
-    else if (hasSA) classes.push("sa-holiday");
-
-    let indicatorHtml = (dayNotes.length > 0 || hasGoogleEntry) ? `<div class="cal-indicator"></div>` : "";
-    dayNotes.forEach(n => { monthlyLog.push({ date: dateStr, title: n.title, type: 'personal', day: d }); });
-
-    html += `<div class="${classes.join(' ')}" id="cell-${dateStr}" onclick="openDay('${dateStr}')">${d}${indicatorHtml}</div>`;
+  for (let d = 1; d <= days; d++) {
+    const ds = toStr(y, m, d);
+    const items = S.index.get(ds) || [];
+    const kinds = new Set(items.map(i => i.kind));
+    const cls = ['cal-day'];
+    if (ds === t) cls.push('today');
+    if (ds === S.selected) cls.push('selected');
+    if (kinds.has('ph') && kinds.has('sa')) cls.push('both-holiday');
+    else if (kinds.has('ph')) cls.push('ph-holiday');
+    else if (kinds.has('sa')) cls.push('sa-holiday');
+if (kinds.has('personal')) {
+      cls.push('has-personal');
+      if (!kinds.has('ph') && !kinds.has('sa') && !kinds.has('flight')) cls.push('personal-day');
+    }
+    if (kinds.has('flight')) {
+      cls.push('has-flight');
+      if (!kinds.has('ph') && !kinds.has('sa')) cls.push('flight-day');
+    }
+    const dots = ['ph', 'sa', 'flight', 'personal'].filter(k => kinds.has(k)).map(k => `<i class="dot ${k}"></i>`).join('');
+    const label = fmtLong(ds) + (items.length ? `, ${items.length} ${items.length === 1 ? 'entry' : 'entries'}` : '');
+    html += `<button type="button" class="${cls.join(' ')}" data-date="${ds}" tabindex="${ds === S.selected ? 0 : -1}"` +
+            ` aria-label="${esc(label)}" aria-pressed="${ds === S.selected}"${ds === t ? ' aria-current="date"' : ''}>${d}<span class="dots">${dots}</span></button>`;
   }
-
   grid.innerHTML = html;
-  
-  // Render Monthly Logs
-  monthlyLog.sort((a, b) => a.day - b.day);
-  $('monthlyEvents').innerHTML = monthlyLog.length === 0 
-    ? `<span style="color:var(--text-3); font-size:13px;">No entries this month.</span>`
-    : monthlyLog.map(ev => {
-        let badge = ev.type === 'ph' ? '🇵🇭' : (ev.type === 'sa' ? '🇸🇦' : '📌');
-        return `<div class="event-item ${ev.type}"><strong>${ev.day}:</strong> ${badge} ${ev.title}</div>`;
-      }).join('');
-      
-  // Auto-open today or previously selected date
-  if (!activeSelectedDateStr) {
-      activeSelectedDateStr = (currentCalDate.getMonth() === _now.getMonth() && currentCalDate.getFullYear() === _now.getFullYear()) ? todayStr : formatStr(1);
+
+  if (dir) {
+    grid.classList.remove('slide-next', 'slide-prev'); void grid.offsetWidth;
+    grid.classList.add(dir === 'next' ? 'slide-next' : 'slide-prev');
   }
-  openDay(activeSelectedDateStr, false);
 }
 
-function openDay(dateStr, reRender = true) {
-  activeSelectedDateStr = dateStr;
-  
-  // Highlight cell
-  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
-  const targetCell = $(`cell-${dateStr}`);
-  if (targetCell) targetCell.classList.add('selected');
-
-  // Update Forms
-  const formattedDate = new Date(dateStr).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  $('dayTitle').innerText = formattedDate;
-  
-  const selectedDateInput = $('selectedDate');
-  const displaySelectedDateInput = $('displaySelectedDate');
-  if (selectedDateInput) selectedDateInput.value = dateStr;
-  if (displaySelectedDateInput) displaySelectedDateInput.value = formattedDate;
-  
-  let html = "";
-  calHolidays.filter(h => h.date === dateStr).forEach(h => {
-    let badge = '📌', cssClass = 'personal', prefix = ''; 
-    if (h.country === 'Philippines' || h.country === 'PH') { badge = '🇵🇭'; cssClass = 'ph'; prefix = 'Holiday: '; }
-    else if (h.country === 'Saudi Arabia' || h.country === 'SA') { badge = '🇸🇦'; cssClass = 'sa'; prefix = 'Holiday: '; }
-    html += `<div class="event-item ${cssClass}">${badge} <strong>${prefix}${h.name}</strong></div>`;
+function markSelected() {
+  document.querySelectorAll('#calendarGrid .cal-day[data-date]').forEach(el => {
+    const on = el.dataset.date === S.selected;
+    el.classList.toggle('selected', on);
+    el.tabIndex = on ? 0 : -1;
+    el.setAttribute('aria-pressed', on);
   });
-  
-  calPersonalNotes.filter(n => n.date === dateStr).forEach(n => {
-    let desc = n.notes ? `<div style="color:var(--text-3); font-size:11px; margin-top:4px;">${n.notes}</div>` : "";
-    html += `<div class="event-item personal">📌 <strong>${n.title}</strong>${desc}</div>`;
-  });
-  
-  $('dayEvents').innerHTML = html || `<span style="color:var(--text-3); font-size:13px; font-style:italic;">Nothing scheduled for this day.</span>`;
 }
 
-// --- PWA BACK BUTTON LOGIC ---
-window.addEventListener('popstate', function(e) {
-  if (e.state === null) {
-      window.location.replace(document.referrer || "mobile.html");
+function eventCard(it, n) {
+  const k = KIND[it.kind];
+  let desc = '';
+  if (it.desc) {
+    const long = it.desc.length > 160 || it.desc.split('\n').length > 3;
+    desc = `<div class="ev-desc${long ? ' clamp' : ''}">${linkify(it.desc)}</div>` + (long ? `<button type="button" class="more">Show more</button>` : '');
+  }
+  return `<article class="ev ${it.kind}" style="--n:${n}"><div class="ev-ic" aria-hidden="true">${k.icon}</div>` +
+         `<div class="ev-body"><div class="ev-title">${esc(it.title)}</div><div class="ev-tag">${k.label}</div>${desc}</div></article>`;
+}
+
+function renderDay() {
+  const ds = S.selected, dt = parse(ds), rel = relLabel(ds);
+  $('dayNum').textContent = dt.getDate();
+  $('dayTile').classList.toggle('is-today', ds === todayStr());
+  $('dayWeek').textContent = dt.toLocaleDateString(undefined, { weekday: 'long' });
+  $('dayMonth').textContent = dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const chip = $('dayRel'); chip.textContent = rel; chip.classList.toggle('now', rel === 'Today');
+
+  const body = $('dayEvents');
+  if (!S.user) {
+    body.innerHTML = `<div class="empty"><div class="empty-ic">🔒</div><p>Sign in to see what's on this day.</p><a class="btn ghost" href="mobile.html">Open dashboard</a></div>`;
+    return;
+  }
+  const items = S.index.get(ds) || [];
+  const addBtn = `<button type="button" class="btn ghost add-inline" data-action="add">+ Add event on this day</button>`;
+  body.innerHTML = items.length
+    ? items.map(eventCard).join('') + addBtn
+    : `<div class="empty"><div class="empty-ic">🗓️</div><p>Nothing scheduled for this day.</p></div>` + addBtn;
+}
+
+function renderMonth() {
+  const y = S.viewY, m = S.viewM;
+  const days = new Date(y, m + 1, 0).getDate(), t = todayStr();
+  let count = 0, html = '';
+  for (let d = 1; d <= days; d++) {
+    const ds = toStr(y, m, d), items = S.index.get(ds);
+    if (!items) continue;
+    count += items.length;
+    const wd = parse(ds).toLocaleDateString(undefined, { weekday: 'short' });
+    html += `<button type="button" class="mrow${ds === S.selected ? ' is-selected' : ''}${ds < t ? ' past' : ''}" data-date="${ds}">` +
+            `<span class="mdate"><b>${d}</b><small>${wd}</small></span><span class="mlist">` +
+            items.map(it => `<span class="mitem"><i class="dot ${it.kind}"></i><span>${esc(it.title)}</span></span>`).join('') +
+            `</span></button>`;
+  }
+  $('monthTitle').textContent = `${monthName(y, m)} at a glance`;
+  $('monthCount').textContent = count ? `${count} ${count === 1 ? 'entry' : 'entries'}` : '';
+  $('monthCount').hidden = !count;
+  $('monthlyEvents').innerHTML = html || `<div class="month-empty">No entries in ${monthName(y, m)}.</div>`;
+}
+
+// ==========================================
+// 6. NAVIGATION + SELECTION
+// ==========================================
+function ensureSelectionInView() {
+  const s = parse(S.selected);
+  if (s.getFullYear() === S.viewY && s.getMonth() === S.viewM) return;
+  const t = new Date();
+  S.selected = (t.getFullYear() === S.viewY && t.getMonth() === S.viewM) ? todayStr() : toStr(S.viewY, S.viewM, 1);
+}
+
+function goMonth(offset) {
+  let y = S.viewY, m = S.viewM + offset;
+  while (m < 0) { m += 12; y--; }
+  while (m > 11) { m -= 12; y++; }
+  S.viewY = y; S.viewM = m;
+  ensureSelectionInView();
+  renderAll(offset > 0 ? 'next' : 'prev');
+}
+
+function selectDate(ds, opts = {}) {
+  const dt = parse(ds);
+  const changed = dt.getFullYear() !== S.viewY || dt.getMonth() !== S.viewM;
+  const dir = changed ? (dt > new Date(S.viewY, S.viewM, 1) ? 'next' : 'prev') : null;
+  S.selected = ds; S.viewY = dt.getFullYear(); S.viewM = dt.getMonth();
+  if (changed) renderAll(dir); else { markSelected(); renderDay(); renderMonth(); }
+  if (opts.open) openSheet();
+  if (opts.focus) { const c = document.querySelector(`#calendarGrid [data-date="${ds}"]`); if (c) c.focus(); }
+}
+function shiftSelected(n) {
+  const d = parse(S.selected); d.setDate(d.getDate() + n);
+  selectDate(dateToStr(d), { focus: true });
+}
+
+$('prevMonth').addEventListener('click', () => goMonth(-1));
+$('nextMonth').addEventListener('click', () => goMonth(1));
+$('todayBtn').addEventListener('click', () => selectDate(todayStr(), { open: false }));
+$('monthDisplay').addEventListener('dblclick', () => selectDate(todayStr()));
+$('dayPrev').addEventListener('click', () => shiftSelected(-1));
+$('dayNext').addEventListener('click', () => shiftSelected(1));
+
+$('calendarGrid').addEventListener('click', e => {
+  const cell = e.target.closest('.cal-day[data-date]'); if (!cell) return;
+  selectDate(cell.dataset.date, { open: true });
+});
+$('monthlyEvents').addEventListener('click', e => {
+  const row = e.target.closest('.mrow'); if (!row) return;
+  selectDate(row.dataset.date, { open: true });
+  if (!isMobile()) window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+$('dayEvents').addEventListener('click', e => {
+  if (e.target.closest('[data-action="add"]')) return openModal(S.selected);
+  const more = e.target.closest('.more');
+  if (more) {
+    const desc = more.previousElementSibling;
+    const open = desc.classList.toggle('clamp') === false;
+    more.textContent = open ? 'Show less' : 'Show more';
   }
 });
 
+// Swipe left/right on the grid to change month
+(() => {
+  const grid = $('calendarGrid'); let x0 = 0, y0 = 0;
+  grid.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  grid.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    if (Math.abs(dx) > 56 && Math.abs(dy) < 40) goMonth(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
 // ==========================================
-// 4. MODAL & FORM SUBMISSION
+// 7. DAY SHEET (mobile)
 // ==========================================
-$('fabBtn').addEventListener('click', () => {
-    $('noteForm').reset();$('selectedDate').value = activeSelectedDateStr;
-    $('displaySelectedDate').value = new Date(activeSelectedDateStr).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });$('noteModal').classList.remove('hidden');
-});
+const panel = $('dayPanel'), backdrop = $('sheetBackdrop');
+const sheetOpen = () => panel.classList.contains('open');
+const modalOpen = () => !$('noteModal').classList.contains('hidden');
+function syncLock() {
+  document.body.classList.toggle('sheet-open', sheetOpen());
+  document.body.classList.toggle('locked', sheetOpen() || modalOpen());
+}
+function openSheet() { if (!isMobile()) return; panel.classList.add('open'); backdrop.classList.add('show'); syncLock(); }
+function closeSheet() { panel.classList.remove('open'); backdrop.classList.remove('show'); panel.style.transform = ''; syncLock(); }
+$('sheetClose').addEventListener('click', closeSheet);
+backdrop.addEventListener('click', closeSheet);
+window.matchMedia('(max-width: 800px)').addEventListener('change', closeSheet);
 
-$('closeModalBtn').addEventListener('click', () => {$('noteModal').classList.add('hidden');
-});
-
-$('noteModal').addEventListener('click', (e) => {
-    if (e.target === $('noteModal'))$('noteModal').classList.add('hidden');
-});
-
-$('noteForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (!auth.currentUser) return toast("You must be signed in to save notes.");
-  
-  const btn = $('submitBtn');
-  btn.innerText = "Syncing..."; btn.disabled = true;
-
-  const payload = { 
-    date: $('selectedDate').value, 
-    title: $('noteTitle').value, 
-    notes: $('noteDesc').value 
+// drag down on the handle / header to dismiss
+(() => {
+  let y0 = 0, dy = 0, active = false;
+  const start = e => { if (!isMobile()) return; active = true; y0 = e.touches[0].clientY; dy = 0; panel.classList.add('dragging'); };
+  const move = e => { if (!active) return; dy = Math.max(0, e.touches[0].clientY - y0); panel.style.transform = `translateY(${dy}px)`; };
+  const end = () => {
+    if (!active) return; active = false; panel.classList.remove('dragging');
+    if (dy > 90) closeSheet(); else panel.style.transform = '';
   };
+  [$('sheetGrab'), $('dayHead')].forEach(el => {
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: true });
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+  });
+})();
+
+// ==========================================
+// 8. ADD EVENT
+// ==========================================
+const modal = $('noteModal'), form = $('noteForm');
+let saving = false, lastFocus = null;
+
+function setDate(ds) {
+  $('eventDate').value = ds || '';
+  $('dateReadout').textContent = ds ? `${fmtLong(ds)} — ${relLabel(ds).toLowerCase()}` : '';
+  document.querySelectorAll('#dateChips button').forEach(b => {
+    const d = new Date(); d.setDate(d.getDate() + Number(b.dataset.offset));
+    b.classList.toggle('active', dateToStr(d) === ds);
+  });
+}
+function clearErrors() {
+  ['fieldTitle', 'fieldDate'].forEach(id => $(id).classList.remove('invalid'));
+  $('titleErr').textContent = '';
+}
+function setSaving(on) {
+  saving = on;
+  const b = $('submitBtn'); b.disabled = on; $('cancelBtn').disabled = on;
+  b.innerHTML = on ? '<span class="spinner"></span>Saving…' : 'Save event';
+}
+
+function openModal(ds) {
+  if (!S.user) { toast('Sign in to add events.'); return; }
+  form.reset(); clearErrors(); setSaving(false);
+  setDate(ds || S.selected);
+  $('descCount').textContent = '0/500';
+  lastFocus = document.activeElement;
+  modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); syncLock();
+  setTimeout(() => $('noteTitle').focus(), 60);
+}
+function closeModal() {
+  if (saving) return;
+  modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); syncLock();
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+
+$('fabBtn').addEventListener('click', () => openModal(S.selected));
+$('closeModalBtn').addEventListener('click', closeModal);
+$('cancelBtn').addEventListener('click', closeModal);
+modal.addEventListener('mousedown', e => { if (e.target === modal) closeModal(); });
+$('dateChips').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const d = new Date(); d.setDate(d.getDate() + Number(b.dataset.offset));
+  setDate(dateToStr(d)); $('fieldDate').classList.remove('invalid');
+});
+$('eventDate').addEventListener('input', e => { setDate(e.target.value); });
+$('noteTitle').addEventListener('input', () => { $('fieldTitle').classList.remove('invalid'); $('titleErr').textContent = ''; });
+$('noteDesc').addEventListener('input', e => { $('descCount').textContent = `${e.target.value.length}/500`; });
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (saving) return;
+  const title = $('noteTitle').value.trim(), date = $('eventDate').value, notes = $('noteDesc').value.trim();
+
+  if (!title) {
+    const f = $('fieldTitle'); f.classList.remove('invalid'); void f.offsetWidth; f.classList.add('invalid');
+    $('titleErr').textContent = 'Give your event a title.'; $('noteTitle').focus(); return;
+  }
+  if (!date) { $('fieldDate').classList.add('invalid'); $('eventDate').focus(); return; }
+  if (!S.user) { toast('Sign in to add events.'); return; }
+
+  setSaving(true);
+  const payload = { date, title, notes };
 
   try {
     await db.ref('calendar_notes').push(payload);
-    await fetch(CALENDAR_API_URL, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-      body: JSON.stringify(payload) 
-    });
-    toast("Note synced to Google Calendar!");
-    $('noteModal').classList.add('hidden');
-  } catch(err) {
-    toast("Failed to sync note");
-    console.error(err);
-  } finally {
-    btn.innerText = "Save & Sync to Google"; btn.disabled = false;
+  } catch (err) {
+    console.error(err); toast("Couldn't save the event. Try again."); setSaving(false); return;
   }
+
+  // Firebase is saved; now mirror to Google Calendar
+  let googleOk = true;
+  try {
+    const res = await fetch(CALENDAR_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+    try { const j = await res.json(); if (j && j.status && j.status !== 'success') googleOk = false; } catch (_) { /* non-JSON reply: assume fine */ }
+  } catch (err) { console.error(err); googleOk = false; }
+
+  const btn = $('submitBtn'); btn.innerHTML = '✓ Saved';
+  await sleep(450);
+  setSaving(false); closeModal();
+
+  selectDate(date, { open: false });
+  const cell = document.querySelector(`#calendarGrid [data-date="${date}"]`);
+  if (cell) { cell.classList.add('pop'); setTimeout(() => cell.classList.remove('pop'), 800); }
+  toast(googleOk ? 'Event saved and synced to Google Calendar' : 'Saved here, but the Google Calendar sync failed');
 });
 
-// Init
-fetchHolidays();
+// ==========================================
+// 9. KEYBOARD + BACK BUTTON
+// ==========================================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (modalOpen()) closeModal(); else if (sheetOpen()) closeSheet(); return; }
 
-// Create a history state so the phone's back button can be intercepted
-window.history.pushState({ page: 'calendar' }, "", "");
+  if (modalOpen()) {
+    if (e.key === 'Tab') {                                   // keep focus inside the dialog
+      const f = [...modal.querySelectorAll('button, input, textarea')].filter(el => !el.disabled && el.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
+    return;
+  }
 
-// When the hardware back button is pressed, return to the previous page
-window.addEventListener('popstate', function() {
-  window.history.back();
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest('input, textarea, select')) return;
+
+  if (e.target.closest('#calendarGrid')) {
+    const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    if (e.key in moves) { e.preventDefault(); shiftSelected(moves[e.key]); return; }
+  }
+  if (e.key === 'PageUp') { e.preventDefault(); goMonth(-1); }
+  else if (e.key === 'PageDown') { e.preventDefault(); goMonth(1); }
+  else if (e.key === 't' || e.key === 'T') selectDate(todayStr(), { focus: true });
+  else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openModal(S.selected); }
 });
-// --------------------------------
+
+// Phone back button: close an open sheet/dialog first, otherwise return to the previous page.
+window.addEventListener('popstate', () => {
+  if (modalOpen() || sheetOpen()) {
+    if (modalOpen()) closeModal();
+    closeSheet();
+    history.pushState({ page: 'calendar' }, '', location.href);
+    return;
+  }
+  window.location.replace(document.referrer || 'mobile.html');
+});
+
+// ==========================================
+// 10. BOOT
+// ==========================================
+async function boot() {
+  history.pushState({ page: 'calendar' }, '', location.href);
+  Loader.step(8, 'Connecting to your account…');
+
+  const holidaysP = loadHolidays().then(ok => { Loader.step(64, 'Loading your events…'); return ok; });
+  authReady.then(() => Loader.step(32, 'Loading public holidays…'));
+  const notesP = notesReady.then(() => Loader.step(88, 'Getting things ready…'));
+
+  const ok = await holidaysP;
+  await Promise.race([Promise.all([authReady, notesP]), sleep(8000)]);   // never hang on a slow connection
+
+  booted = true;
+  buildIndex(); renderAll(); showBanner(ok);
+  Loader.finish();
+}
+boot();
 </script>
 </body>
 </html>
