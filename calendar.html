@@ -488,11 +488,14 @@ $('noteForm').addEventListener('submit', async (e) => {
 // Init
 fetchHolidays();
 
-// PWA Back Button Handling
+// Create a history state so the phone's back button can be intercepted
 window.history.pushState({ page: 'calendar' }, "", "");
+
+// When the hardware back button is pressed, return to the previous page
 window.addEventListener('popstate', function() {
   window.history.back();
 });
+// --------------------------------
 </script>
 </body>
 </html>
