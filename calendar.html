@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitaka Smart Calendar</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #eef2f1;
+  --card: #ffffff;
+  --text: #10231f;
+  --text-2: #4b5f5a;
+  --text-3: #8a9c97;
+  --border: #dce4e2;
+  --key: #f2f5f4;
+  --key-hover: #e6ecea;
+  --accent: #0ea5e9;
+  --ph-bg: #dbeafe; --ph-txt: #1e3a8a;
+  --sa-bg: #dcfce7; --sa-txt: #14532d;
+  --personal: #ec4899;
+  --shadow: 0 1px 2px rgba(16,35,31,.06), 0 8px 24px -12px rgba(16,35,31,.18);
+  --modal-bg: rgba(16, 35, 31, 0.6);
+  --font: 'Sora', system-ui, sans-serif;
+}
+:root[data-theme="dark"] {
+  --bg: #0c1614;
+  --card: #142220;
+  --text: #e6f0ed;
+  --text-2: #a3b7b1;
+  --text-3: #6b807a;
+  --border: #243633;
+  --key: #1b2c29;
+  --key-hover: #243836;
+  --ph-bg: #1e40af; --ph-txt: #dbeafe;
+  --sa-bg: #166534; --sa-txt: #dcfce7;
+  --modal-bg: rgba(0, 0, 0, 0.8);
+  --shadow: 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  padding: 20px; font-family: var(--font); background: var(--bg); color: var(--text);
+  display: flex; justify-content: center;
+}
+button, input, textarea { font-family: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { width: 100%; max-width: 1100px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); padding: 20px; }
+
+/* ── HEADER ── */
+.head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.head h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--accent); }
+.head-actions { display: flex; gap: 8px; }
+.icon-btn {
+  border: 1px solid var(--border); background: var(--key); border-radius: 10px;
+  width: 38px; height: 38px; cursor: pointer; font-size: 16px;
+  display: grid; place-items: center; transition: background .15s;
+}
+.icon-btn:hover { background: var(--key-hover); }
+.icon-btn.spin { animation: spin .7s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── CALENDAR GRID (LEFT) ── */
+.cal-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.cal-controls h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.legend { display: flex; gap: 10px; font-size: 11px; margin-bottom: 15px; flex-wrap: wrap; font-weight: 600; }
+.legend span { padding: 4px 8px; border-radius: 6px; }
+.l-ph { background: var(--ph-bg); color: var(--ph-txt); }
+.l-sa { background: var(--sa-bg); color: var(--sa-txt); }
+.l-per { border: 1px solid var(--personal); color: var(--personal); }
+
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+.cal-header { font-size: 12px; font-weight: 600; color: var(--text-3); padding-bottom: 8px; }
+.cal-day {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border); background: var(--key); position: relative;
+  transition: all .15s;
+}
+.cal-day:hover { border-color: var(--accent); transform: scale(1.05); }
+.cal-day.empty { background: transparent; border: none; cursor: default; }
+.cal-day.empty:hover { transform: none; }
+.cal-day.today { border: 2px solid var(--accent); font-weight: 700; }
+.cal-day.selected { border: 2px solid var(--text); }
+
+.cal-day.ph-holiday { background: var(--ph-bg); color: var(--ph-txt); border-color: transparent; }
+.cal-day.sa-holiday { background: var(--sa-bg); color: var(--sa-txt); border-color: transparent; }
+.cal-day.both-holiday { background: linear-gradient(135deg, var(--ph-bg), var(--sa-bg)); border-color: transparent; }
+.cal-day.has-personal { border: 2px solid var(--personal); }
+
+.cal-indicator {
+  position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+  width: 5px; height: 5px; background: var(--personal); border-radius: 50%;
+}
+
+/* ── SIDE PANEL (RIGHT) ── */
+.side-panel { display: flex; flex-direction: column; gap: 20px; height: 100%; min-height: 500px; }
+.day-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.section-title { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 0 0 10px 0; }
+.log-scroll { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.day-events-container { min-height: 120px; }
+.month-events-container { flex: 1; display: flex; flex-direction: column; min-height: 200px; border-top: 1px solid var(--border); padding-top: 15px; }
+
+.event-item { font-size: 13px; padding: 10px; border-radius: 8px; background: var(--key); }
+.event-item.ph { border-left: 4px solid #eab308; }
+.event-item.sa { border-left: 4px solid #f97316; }
+.event-item.personal { border-left: 4px solid var(--personal); }
+
+/* ── FLOATING ACTION BUTTON (FAB) ── */
+.fab {
+  position: fixed; bottom: 30px; right: 30px;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--personal); color: white; border: none;
+  font-size: 28px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4); cursor: pointer;
+  transition: transform 0.2s, background 0.2s; z-index: 90;
+}
+.fab:hover { transform: scale(1.1); background: #db2777; }
+.fab:active { transform: scale(0.95); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: var(--modal-bg); display: flex; align-items: center; justify-content: center;
+  z-index: 100; opacity: 1; transition: opacity 0.2s; backdrop-filter: blur(4px);
+}
+.modal-overlay.hidden { opacity: 0; pointer-events: none; }
+.modal-card {
+  background: var(--card); padding: 25px; border-radius: 20px;
+  width: 90%; max-width: 400px; box-shadow: var(--shadow);
+  transform: translateY(0); transition: transform 0.3s; position: relative;
+}
+.modal-overlay.hidden .modal-card { transform: translateY(20px); }
+.close-modal {
+  position: absolute; top: 15px; right: 20px; font-size: 24px;
+  cursor: pointer; color: var(--text-3); transition: color 0.2s;
+}
+.close-modal:hover { color: var(--danger); }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.form-group input, .form-group textarea {
+  width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--key); color: var(--text); font-size: 14px; outline: none; transition: border .15s;
+}
+.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+.btn-submit {
+  width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--personal);
+  color: white; font-weight: 600; font-size: 14px; cursor: pointer; transition: opacity .15s;
+}
+.btn-submit:hover { opacity: 0.9; }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0;
+  background: var(--text); color: var(--card); padding: 12px 20px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; pointer-events: none; transition: all .2s; z-index: 1000;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 800px) {
+  body { padding: 12px; }
+  .app { grid-template-columns: 1fr; }
+  .side-panel { min-height: auto; }
+  .fab { bottom: 20px; right: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  
+  <!-- LEFT COLUMN: CALENDAR GRID -->
+  <section class="card">
+    <div class="head">
+      <h2>Pitaka Calendar</h2>
+      <div class="head-actions">
+        <a href="mobile.html" style="text-decoration: none;">
+          <button class="icon-btn" title="Back to Dashboard">🏠</button>
+        </a>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme">🌓</button>
+        <button class="icon-btn" id="refreshBtn" title="Sync Google Calendar">🔄</button>
+      </div>
+    </div>
+
+    <div class="cal-controls">
+      <button class="icon-btn" onclick="changeMonth(-1)">&#9664;</button>
+      <h3 id="monthDisplay">Loading...</h3>
+      <button class="icon-btn" onclick="changeMonth(1)">&#9654;</button>
+    </div>
+
+    <div class="legend">
+      <span class="l-ph">🇵🇭 PH Holiday</span>
+      <span class="l-sa">🇸🇦 SA Holiday</span>
+      <span class="l-per">📌 Personal</span>
+    </div>
+
+    <div id="calendarGrid" class="calendar-grid"></div>
+  </section>
+
+  <!-- RIGHT COLUMN: OVERVIEW & DAY DETAILS -->
+  <section class="card side-panel">
+    
+    <!-- Selected Day Events -->
+    <div class="day-events-container">
+      <div class="day-title" id="dayTitle">Select a day</div>
+      <div class="log-scroll" id="dayEvents" style="max-height: 250px;">
+        <span style="color: var(--text-3); font-size: 13px;">Click a date on the calendar to view details.</span>
+      </div>
+    </div>
+
+    <!-- Monthly Overview -->
+    <div class="month-events-container">
+      <h4 class="section-title">📅 This Month's Overview</h4>
+      <div id="monthlyEvents" class="log-scroll"></div>
+    </div>
+
+  </section>
+
+</div>
+
+<!-- FLOATING ACTION BUTTON -->
+<button class="fab" id="fabBtn" title="Add Note/Event">+</button>
+
+<!-- ADD NOTE MODAL -->
+<div id="noteModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <span class="close-modal" id="closeModalBtn">&times;</span>
+    <h3 style="margin-top: 0; color: var(--personal); font-size: 18px;">Add Event</h3>
+    <form id="noteForm">
+      <input type="hidden" id="selectedDate">
+      
+      <div class="form-group">
+        <label>Selected Date</label>
+        <input type="text" id="displaySelectedDate" readonly style="background: var(--bg); color: var(--text-2); font-weight: 600; cursor: not-allowed;">
+      </div>
+
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="noteTitle" required placeholder="e.g., Doctor Appointment, Pay Bills">
+      </div>
+      
+      <div class="form-group">
+        <label>Description (Optional)</label>
+        <textarea id="noteDesc" rows="3" placeholder="Any extra details..."></textarea>
+      </div>
+      
+      <button type="submit" class="btn-submit" id="submitBtn">Save & Sync to Google</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==========================================
+// 1. FIREBASE INITIALIZATION
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
+  authDomain: "finance-app-23309.firebaseapp.com",
+  databaseURL: "https://finance-app-23309-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "finance-app-23309",
+  storageBucket: "finance-app-23309.firebasestorage.app",
+  messagingSenderId: "268979076437",
+  appId: "1:268979076437:web:204abafc00e7558f4e83dc",
+};
+if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+const auth = firebase.auth();
+const db = firebase.database();
+
+// ==========================================
+// 2. GLOBALS & THEME
+// ==========================================
+const $ = id => document.getElementById(id);
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+(function () {
+  const saved = store('pitaka-theme');
+  const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+})();
+$('themeBtn').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next; store('pitaka-theme', next);
+});
+
+// ==========================================
+// 3. CALENDAR LOGIC
+// ==========================================
+const CALENDAR_API_URL = "https://script.google.com/macros/s/AKfycbz5bRtVHyNUh0BUZ5M-_yLn3ZqFIfNpojdD_2cBy_ikQhISryN0WIYeVTa1Vr1wcDDx4Q/exec";
+let calHolidays = [];
+let calPersonalNotes = [];
+let currentCalDate = new Date(); 
+let activeSelectedDateStr = "";
+
+async function fetchHolidays() {
+  $('refreshBtn').classList.add('spin');
+  try {
+    const res = await fetch(CALENDAR_API_URL);
+    const json = await res.json();
+    if (json.status === "success") { 
+      calHolidays = json.data; 
+      renderCalendar(); 
+      toast("Calendar synced with Google");
+    }
+  } catch(e) { 
+    toast("Failed to load holidays"); 
+  }
+  setTimeout(() => $('refreshBtn').classList.remove('spin'), 700);
+}
+
+$('refreshBtn').addEventListener('click', fetchHolidays);
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    db.ref('calendar_notes').on('value', snap => {
+      calPersonalNotes = [];
+      snap.forEach(child => { calPersonalNotes.push({ id: child.key, ...child.val() }); });
+      renderCalendar(); 
+    });
+  }
+});
+
+function changeMonth(offset) {
+  currentCalDate.setMonth(currentCalDate.getMonth() + offset);
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const grid = $('calendarGrid');
+  const monthDisplay = $('monthDisplay');
+  const year = currentCalDate.getFullYear(), month = currentCalDate.getMonth();
+  
+  monthDisplay.innerText = currentCalDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  let html = '';
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(h => {
+    html += `<div class="cal-header">${h}</div>`;
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for(let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  const formatStr = (d) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const _now = new Date();
+  const todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+  let monthlyLog = [];
+
+  for(let d = 1; d <= daysInMonth; d++) {
+    const dateStr = formatStr(d);
+    let classes = ["cal-day"];
+    if (dateStr === todayStr) classes.push("today");
+    if (dateStr === activeSelectedDateStr) classes.push("selected");
+
+    const dayHolidays = calHolidays.filter(h => h.date === dateStr);
+    const dayNotes = calPersonalNotes.filter(n => n.date === dateStr);
+    
+    const hasGoogleEntry = dayHolidays.some(h => h.country === 'Personal_Entry' || h.country === 'Personal');
+    if (dayNotes.length > 0 || hasGoogleEntry) classes.push("has-personal");
+
+    let hasPH = false, hasSA = false;
+    dayHolidays.forEach(h => {
+      let type = 'personal'; 
+      if (h.country === 'Philippines' || h.country === 'PH') { hasPH = true; type = 'ph'; } 
+      else if (h.country === 'Saudi Arabia' || h.country === 'SA') { hasSA = true; type = 'sa'; } 
+      monthlyLog.push({ date: dateStr, title: h.name, type: type, day: d });
+    });
+
+    if (hasPH && hasSA) classes.push("both-holiday");
+    else if (hasPH) classes.push("ph-holiday");
+    else if (hasSA) classes.push("sa-holiday");
+
+    let indicatorHtml = (dayNotes.length > 0 || hasGoogleEntry) ? `<div class="cal-indicator"></div>` : "";
+    dayNotes.forEach(n => { monthlyLog.push({ date: dateStr, title: n.title, type: 'personal', day: d }); });
+
+    html += `<div class="${classes.join(' ')}" id="cell-${dateStr}" onclick="openDay('${dateStr}')">${d}${indicatorHtml}</div>`;
+  }
+
+  grid.innerHTML = html;
+  
+  // Render Monthly Logs
+  monthlyLog.sort((a, b) => a.day - b.day);
+  $('monthlyEvents').innerHTML = monthlyLog.length === 0 
+    ? `<span style="color:var(--text-3); font-size:13px;">No entries this month.</span>`
+    : monthlyLog.map(ev => {
+        let badge = ev.type === 'ph' ? '🇵🇭' : (ev.type === 'sa' ? '🇸🇦' : '📌');
+        return `<div class="event-item ${ev.type}"><strong>${ev.day}:</strong> ${badge} ${ev.title}</div>`;
+      }).join('');
+      
+  // Auto-open today or previously selected date
+  if (!activeSelectedDateStr) {
+      activeSelectedDateStr = (currentCalDate.getMonth() === _now.getMonth() && currentCalDate.getFullYear() === _now.getFullYear()) ? todayStr : formatStr(1);
+  }
+  openDay(activeSelectedDateStr, false);
+}
+
+function openDay(dateStr, reRender = true) {
+  activeSelectedDateStr = dateStr;
+  
+  // Highlight cell
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
+  const targetCell = $(`cell-${dateStr}`);
+  if (targetCell) targetCell.classList.add('selected');
+
+  // Update Forms
+  const formattedDate = new Date(dateStr).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  $('dayTitle').innerText = formattedDate;
+  $('selectedDate').value = dateStr;
+  $('displaySelectedDate').value = formattedDate;
+  
+  let html = "";
+  calHolidays.filter(h => h.date === dateStr).forEach(h => {
+    let badge = '📌', cssClass = 'personal', prefix = ''; 
+    if (h.country === 'Philippines' || h.country === 'PH') { badge = '🇵🇭'; cssClass = 'ph'; prefix = 'Holiday: '; }
+    else if (h.country === 'Saudi Arabia' || h.country === 'SA') { badge = '🇸🇦'; cssClass = 'sa'; prefix = 'Holiday: '; }
+    html += `<div class="event-item ${cssClass}">${badge} <strong>${prefix}${h.name}</strong></div>`;
+  });
+  
+  calPersonalNotes.filter(n => n.date === dateStr).forEach(n => {
+    let desc = n.notes ? `<div style="color:var(--text-3); font-size:11px; margin-top:4px;">${n.notes}</div>` : "";
+    html += `<div class="event-item personal">📌 <strong>${n.title}</strong>${desc}</div>`;
+  });
+  
+  $('dayEvents').innerHTML = html || `<span style="color:var(--text-3); font-size:13px; font-style:italic;">Nothing scheduled for this day.</span>`;
+}
+
+// ==========================================
+// 4. MODAL & FORM SUBMISSION
+// ==========================================
+$('fabBtn').addEventListener('click', () => {
+    $('noteForm').reset();$('selectedDate').value = activeSelectedDateStr;
+    $('displaySelectedDate').value = new Date(activeSelectedDateStr).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });$('noteModal').classList.remove('hidden');
+});
+
+$('closeModalBtn').addEventListener('click', () => {$('noteModal').classList.add('hidden');
+});
+
+$('noteModal').addEventListener('click', (e) => {
+    if (e.target === $('noteModal'))$('noteModal').classList.add('hidden');
+});
+
+$('noteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!auth.currentUser) return toast("You must be signed in to save notes.");
+  
+  const btn = $('submitBtn');
+  btn.innerText = "Syncing..."; btn.disabled = true;
+
+  const payload = { 
+    date: $('selectedDate').value, 
+    title: $('noteTitle').value, 
+    notes: $('noteDesc').value 
+  };
+
+  try {
+    await db.ref('calendar_notes').push(payload);
+    await fetch(CALENDAR_API_URL, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+      body: JSON.stringify(payload) 
+    });
+    toast("Note synced to Google Calendar!");
+    $('noteModal').classList.add('hidden');
+  } catch(err) {
+    toast("Failed to sync note");
+    console.error(err);
+  } finally {
+    btn.innerText = "Save & Sync to Google"; btn.disabled = false;
+  }
+});
+
+// Init
+fetchHolidays();
+
+// PWA Back Button Handling
+window.history.pushState({ page: 'calendar' }, "", "");
+window.addEventListener('popstate', function() {
+  window.location.href = "mobile.html";
+});
+</script>
+</body>
+</html>
