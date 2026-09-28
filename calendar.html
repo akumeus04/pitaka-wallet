@@ -178,6 +178,20 @@ button, input, textarea { font-family: inherit; color: inherit; }
 <body>
 
 <div class="app">
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.4s ease;">
+  <div style="font-size: 45px; margin-bottom: 15px; animation: bounce 1s infinite alternate;">📅</div>
+  <div style="font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 12px; font-family: var(--font);" id="loadingPercent">0%</div>
+  <div style="width: 220px; height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+    <div id="loadingBar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.2s ease;"></div>
+  </div>
+  <div style="font-size: 13px; color: var(--text-3); font-weight: 500;" id="loadingText">Connecting to secure server...</div>
+</div>
+
+<style>
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+</style>
   
   <!-- LEFT COLUMN: CALENDAR GRID -->
   <section class="card">
@@ -299,7 +313,7 @@ $('themeBtn').addEventListener('click', () => {
 });
 
 // ==========================================
-// 3. CALENDAR LOGIC
+// 3. CALENDAR LOGIC & LOADING ANIMATION
 // ==========================================
 const CALENDAR_API_URL = "https://script.google.com/macros/s/AKfycbz5bRtVHyNUh0BUZ5M-_yLn3ZqFIfNpojdD_2cBy_ikQhISryN0WIYeVTa1Vr1wcDDx4Q/exec";
 let calHolidays = [];
@@ -307,18 +321,71 @@ let calPersonalNotes = [];
 let currentCalDate = new Date(); 
 let activeSelectedDateStr = "";
 
+// --- LOADING ANIMATION SYSTEM ---
+let loadProgress = 0;
+let loadInterval;
+
+function updateLoader(pct, text) {
+  loadProgress = pct;
+  const pctEl = $('loadingPercent');
+  const barEl = $('loadingBar');
+  const textEl = $('loadingText');
+  
+  if (pctEl) pctEl.innerText = pct + '%';
+  if (barEl) barEl.style.width = pct + '%';
+  if (textEl && text) textEl.innerText = text;
+}
+
+function startLoadingAnim() {
+  $('loadingOverlay').style.display = 'flex';$('loadingOverlay').style.opacity = '1';
+  updateLoader(0, "Connecting to secure server...");
+  
+  loadInterval = setInterval(() => {
+    if (loadProgress < 85) {
+      updateLoader(loadProgress + Math.floor(Math.random() * 6) + 1);
+    }
+  }, 100);
+}
+
+function finishLoading() {
+  clearInterval(loadInterval);
+  updateLoader(100, "Complete!");
+  
+  setTimeout(() => {
+    const overlay = $('loadingOverlay');
+    if (overlay) {
+      overlay.style.opacity = '0'; // Fade out
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        
+        // Push history state ONLY after the UI is fully loaded and revealed
+        window.history.pushState({ page: 'calendar' }, "", window.location.href);
+      }, 400); // Wait for CSS transition
+    }
+  }, 300);
+}
+
+// --- MAIN CALENDAR FETCH ---
 async function fetchHolidays() {
   $('refreshBtn').classList.add('spin');
+  startLoadingAnim();
+  updateLoader(20, "Fetching public holidays...");
+  
   try {
     const res = await fetch(CALENDAR_API_URL);
+    updateLoader(60, "Parsing calendar data...");
+    
     const json = await res.json();
     if (json.status === "success") { 
       calHolidays = json.data; 
+      updateLoader(85, "Rendering calendar view...");
       renderCalendar(); 
       toast("Calendar synced with Google");
+      finishLoading();
     }
   } catch(e) { 
     toast("Failed to load holidays"); 
+    finishLoading();
   }
   setTimeout(() => $('refreshBtn').classList.remove('spin'), 700);
 }
@@ -421,8 +488,11 @@ function openDay(dateStr, reRender = true) {
   // Update Forms
   const formattedDate = new Date(dateStr).toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   $('dayTitle').innerText = formattedDate;
-  $('selectedDate').value = dateStr;
-  $('displaySelectedDate').value = formattedDate;
+  
+  const selectedDateInput = $('selectedDate');
+  const displaySelectedDateInput = $('displaySelectedDate');
+  if (selectedDateInput) selectedDateInput.value = dateStr;
+  if (displaySelectedDateInput) displaySelectedDateInput.value = formattedDate;
   
   let html = "";
   calHolidays.filter(h => h.date === dateStr).forEach(h => {
@@ -439,6 +509,13 @@ function openDay(dateStr, reRender = true) {
   
   $('dayEvents').innerHTML = html || `<span style="color:var(--text-3); font-size:13px; font-style:italic;">Nothing scheduled for this day.</span>`;
 }
+
+// --- PWA BACK BUTTON LOGIC ---
+window.addEventListener('popstate', function(e) {
+  if (e.state === null) {
+      window.location.replace(document.referrer || "mobile.html");
+  }
+});
 
 // ==========================================
 // 4. MODAL & FORM SUBMISSION
@@ -491,15 +568,9 @@ fetchHolidays();
 // Create a history state so the phone's back button can be intercepted
 window.history.pushState({ page: 'calendar' }, "", "");
 
-// When the hardware back button is pressed, handle it safely
+// When the hardware back button is pressed, return to the previous page
 window.addEventListener('popstate', function() {
-  // If the browser history is too short (e.g., opened in a new tab), force it to the dashboard
-  if (window.history.length <= 2 || !document.referrer) {
-    window.location.replace("mobile.html");
-  } else {
-    // Otherwise, go back to the previous page naturally
-    window.history.back();
-  }
+  window.history.back();
 });
 // --------------------------------
 </script>
