@@ -493,12 +493,12 @@ pad.addEventListener('input', () => {
   }, 1000);
 });
 
-    // Create a history state so the phone's back button can be intercepted
+// Create a history state so the phone's back button can be intercepted
     window.history.pushState({ page: 'calculator' }, "", "");
     
-    // When the hardware back button is pressed, force a redirect to mobile.html
+    // When the hardware back button is pressed, return to the previous page
     window.addEventListener('popstate', function() {
-      window.location.href = "mobile.html";
+      window.history.back();
     });
     // --------------------------------
   
