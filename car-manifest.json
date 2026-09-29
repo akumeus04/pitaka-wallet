@@ -1,7 +1,8 @@
 {
+  "id": "pitaka-car-tracker",
   "name": "Car Loan Tracker",
   "short_name": "CarLoanTracker",
-  "start_url": "./mobile.html",
+  "start_url": "./car.html", 
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
