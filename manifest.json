@@ -1,7 +1,9 @@
 {
+  "id": "pitaka-main-wallet",
   "name": "Pitaka Wallet Mobile",
   "short_name": "Pitaka",
   "start_url": "./mobile.html",
+  "scope": "./mobile.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
