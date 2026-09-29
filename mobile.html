@@ -10,6 +10,17 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="logo-192.png">
   <title>My Wallet na 💳 Pitaka</title>
+
+  <!-- Service Worker Registration for Pitaka -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./pitaka-sw.js', { scope: './mobile.html' })
+          .then(reg => console.log('Pitaka Service Worker registered'))
+          .catch(err => console.error('Pitaka Service Worker failed', err));
+      });
+    }
+  </script>
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
