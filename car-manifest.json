@@ -1,8 +1,9 @@
 {
   "id": "pitaka-car-tracker",
   "name": "Car Loan Tracker",
-  "short_name": "CarLoanTracker",
-  "start_url": "./car_loan.html", 
+  "short_name": "CarTracker",
+  "start_url": "./car.html?mode=app",
+  "scope": "https://akumeus04.github.io/pitaka-wallet/car_loan.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
