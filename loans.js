@@ -108,23 +108,10 @@ document.getElementById('loanDuration').addEventListener('click', function(e) {
   const isEditingExisting = document.getElementById('loanEditId').value !== "";
   
   if (isEditingExisting) {
-    // Inject a local warning directly under the input box
-    let warning = document.getElementById('loanDurationWarning');
-    if (!warning) {
-        warning = document.createElement('div');
-        warning.id = 'loanDurationWarning';
-        warning.style.color = 'var(--danger)';
-        warning.style.fontSize = '11px';
-        warning.style.marginTop = '4px';
-        warning.style.fontWeight = 'bold';
-        this.parentNode.appendChild(warning);
-    }
-    
-    warning.innerText = "⚠️ Duration locked. Please cancel and recreate.";
-    
-    // Clear the warning after 4 seconds
-    clearTimeout(this.warningTimeout);
-    this.warningTimeout = setTimeout(() => { warning.innerText = ''; }, 4000);
+    // Force the field to lose focus so the keyboard doesn't pop up
+    this.blur();
+    // Trigger the pop-up warning
+    alert("⚠️ To change duration, delete and recreate.");
   }
 });
 
