@@ -103,7 +103,7 @@ function triggerLoanView(id) {
     toggleLoanReadOnly(true); 
 }
 
-// SAFETY NET: Prevent user from changing duration on existing records..
+// SAFETY NET: Prevent user from changing duration on existing records.
 document.getElementById('loanDuration').addEventListener('click', function(e) {
   const isEditingExisting = document.getElementById('loanEditId').value !== "";
   
