@@ -30,12 +30,20 @@ document.getElementById('loanDesc').addEventListener('input', function(e) {
 // ==========================================
 function toggleLoanReadOnly(isReadOnly) {
     const form = document.getElementById('loanForm');
+    const isEditingExisting = document.getElementById('loanEditId').value !== "";
+
     form.querySelectorAll('input, select, textarea').forEach(el => {
         // ALWAYS keep the Status dropdown active
         if (el.id === 'loanStatus') {
             el.disabled = false;
             el.style.backgroundColor = '';
-        } else if (el.tagName === 'SELECT') {
+        } 
+        // 🚨 THE FIX: FORCE Duration to stay locked if we are editing an existing record
+        else if (el.id === 'loanDuration' && isEditingExisting) {
+            el.readOnly = true;
+            el.style.backgroundColor = '#f9fafb';
+        } 
+        else if (el.tagName === 'SELECT') {
             el.disabled = isReadOnly;
             el.style.backgroundColor = isReadOnly ? '#f9fafb' : '';
         } else {
@@ -94,6 +102,31 @@ function triggerLoanView(id) {
     document.getElementById('loanFormTitle').innerText = "View: " + document.getElementById('loanDesc').value;
     toggleLoanReadOnly(true); 
 }
+
+// SAFETY NET: Prevent user from changing duration on existing records
+document.getElementById('loanDuration').addEventListener('click', function(e) {
+  const isEditingExisting = document.getElementById('loanEditId').value !== "";
+  
+  if (isEditingExisting) {
+    // Inject a local warning directly under the input box
+    let warning = document.getElementById('loanDurationWarning');
+    if (!warning) {
+        warning = document.createElement('div');
+        warning.id = 'loanDurationWarning';
+        warning.style.color = 'var(--danger)';
+        warning.style.fontSize = '11px';
+        warning.style.marginTop = '4px';
+        warning.style.fontWeight = 'bold';
+        this.parentNode.appendChild(warning);
+    }
+    
+    warning.innerText = "⚠️ Duration cannot be modified after creation. Please delete and recreate if a change is needed.";
+    
+    // Clear the warning after 4 seconds
+    clearTimeout(this.warningTimeout);
+    this.warningTimeout = setTimeout(() => { warning.innerText = ''; }, 4000);
+  }
+});
 
 // ==========================================
 // EXPLICIT SUBMIT HANDLER
