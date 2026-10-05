@@ -103,7 +103,7 @@ function triggerExpView(id) {
     toggleExpReadOnly(true); 
 }
 
-// SAFETY NET: Prevent user from changing duration on existing records
+// SAFETY NET: Prevent user from changing duration on existing records...
 document.getElementById('expDuration').addEventListener('click', function(e) {
   const isEditingExisting = document.getElementById('expEditId').value !== "";
   
