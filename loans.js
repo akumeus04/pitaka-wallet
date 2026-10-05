@@ -120,7 +120,7 @@ document.getElementById('loanDuration').addEventListener('click', function(e) {
         this.parentNode.appendChild(warning);
     }
     
-    warning.innerText = "⚠️ Duration cannot be modified after creation. Please delete and recreate if a change is needed.";
+    warning.innerText = "⚠️ Duration locked. Please cancel and recreate.";
     
     // Clear the warning after 4 seconds
     clearTimeout(this.warningTimeout);
