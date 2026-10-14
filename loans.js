@@ -182,6 +182,11 @@ function renderLoanHistory() {
 
   let filtered = masterData.loans.filter(loan => isItemActiveInMonth(loan, activeBrowserMonth)).reverse();
   
+  // Apply Cancelled Visibility Filter
+  if (!window.showCancelledItems) {
+      filtered = filtered.filter(loan => loan["Status"] !== "Cancelled");
+  }
+  
 // Apply Search Filter
   if (query) {
     filtered = filtered.filter(loan => {
