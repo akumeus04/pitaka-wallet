@@ -26,6 +26,26 @@ document.getElementById('expDesc').addEventListener('input', function(e) {
 });
 
 // ==========================================
+// CANCELLED STATUS TOGGLE LOGIC
+// ==========================================
+window.showCancelledItems = false; // Default to hiding cancelled items
+
+function toggleCancelledStatus() {
+    window.showCancelledItems = !window.showCancelledItems;
+    
+    // Update the text and color of all toggle buttons
+    const btns = document.querySelectorAll('.btn-toggle-cancelled');
+    btns.forEach(btn => {
+        btn.innerHTML = window.showCancelledItems ? "👁️ Hide Cancelled" : "🙈 Show Cancelled";
+        btn.style.background = window.showCancelledItems ? "#475569" : "#64748b";
+    });
+    
+    // Refresh the tables to apply the new filter
+    if (typeof renderExpenseHistory === "function") renderExpenseHistory();
+    if (typeof renderLoanHistory === "function") renderLoanHistory();
+}
+
+// ==========================================
 // FORM LOCKING LOGIC (READ-ONLY VIEW)
 // ==========================================
 function toggleExpReadOnly(isReadOnly) {
@@ -183,6 +203,11 @@ function renderExpenseHistory() {
   const query = searchInput ? searchInput.value.toLowerCase() : "";
 
   let filtered = masterData.expenses.filter(exp => isItemActiveInMonth(exp, activeBrowserMonth)).reverse();
+  
+  // Apply Cancelled Visibility Filter
+  if (!window.showCancelledItems) {
+      filtered = filtered.filter(exp => exp["Status"] !== "Cancelled");
+  }
   
 // Apply Search Filter
   if (query) {
