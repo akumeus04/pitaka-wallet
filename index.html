@@ -1085,6 +1085,7 @@
   
   <button class="btn" onclick="openCategoryOverview('expenses')" style="background: #0ea5e9;">📊 Overview</button>
   <button class="btn" onclick="openNewExpModal()">+ Add Expense</button>
+  <button class="btn btn-toggle-cancelled" onclick="toggleCancelledStatus()" style="background: #64748b;">🙈 Show Cancelled</button>
 </div>
     </div>
     
@@ -1120,6 +1121,7 @@
   
   <button class="btn" onclick="openCategoryOverview('loans')" style="background: #0ea5e9;">📊 Overview</button>
   <button class="btn" onclick="openNewLoanModal()">+ Add Loan</button>
+  <button class="btn btn-toggle-cancelled" onclick="toggleCancelledStatus()" style="background: #64748b;">🙈 Show Cancelled</button>
 </div>
     </div>
     <input type="text" id="searchLoans" class="search-box" placeholder="🔍 Search descriptions, notes, or status..." oninput="renderLoanHistory()">
