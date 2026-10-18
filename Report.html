@@ -176,7 +176,29 @@ tr:hover td.total-col { background: var(--sar-soft); }
 }
 .result-bubble .bubble-close:hover { color: var(--text); }
 
+
+/* ── Graphic report (pie charts) ── */
+.pie-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pie-panel { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--card); min-width: 0; }
+.pie-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.pie-head .pt { font-weight: 700; font-size: 13px; }
+.pie-head .pv { font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--accent); }
+.pie-body { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.pie-svg { width: 210px; height: 210px; flex-shrink: 0; overflow: visible; }
+.pie-svg .slice { stroke: var(--card); stroke-width: 2; cursor: pointer; transform-origin: 100px 100px; transition: transform .15s, opacity .15s; }
+.pie-body.has-hl .pie-svg .slice { opacity: .45; }
+.pie-body.has-hl .pie-svg .slice.hl { opacity: 1; transform: scale(1.05); }
+.pie-legend { flex: 1; min-width: 200px; list-style: none; margin: 0; padding: 0; }
+.pie-legend li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 12px; cursor: default; transition: background .15s; }
+.pie-legend li.hl { background: var(--key); }
+.pie-legend .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.pie-legend .nm { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pie-legend .am { font-family: var(--mono); }
+.pie-legend .pc { font-family: var(--mono); color: var(--text-3); width: 46px; text-align: right; }
+.pie-empty { text-align: center; padding: 30px 10px; color: var(--text-3); }
+
 @media (max-width: 760px) {
+  .pie-grid { grid-template-columns: 1fr; }
   .page { padding: 12px; }
   .header h2 { font-size: 14.5px; }
   .btn span.lbl { display: none; }
@@ -240,6 +262,14 @@ tr:hover td.total-col { background: var(--sar-soft); }
   <!-- ==================== SAR PAGE VIEW ==================== -->
   <div id="view-SAR">
     <div class="table-card">
+      <h3>🥧 Graphic report <span class="badge-sar">SAR</span> <span class="sub" id="pieSubSAR" style="font-weight:500;color:var(--text-3);font-size:11px;"></span></h3>
+      <div class="pie-grid">
+        <div class="pie-panel"><div class="pie-head"><span class="pt">💸 Expenses</span><span class="pv" id="pieTotExpSAR"></span></div><div id="pieExpSAR"></div></div>
+        <div class="pie-panel"><div class="pie-head"><span class="pt">🏦 Loans</span><span class="pv" id="pieTotLoanSAR"></span></div><div id="pieLoanSAR"></div></div>
+      </div>
+    </div>
+
+    <div class="table-card">
       <h3>💸 Expenses ledger <span class="badge-sar">SAR</span></h3>
       <div class="table-scroll">
         <table id="expenseTableSAR">
@@ -278,6 +308,14 @@ tr:hover td.total-col { background: var(--sar-soft); }
 
   <!-- ==================== PHP PAGE VIEW ==================== -->
   <div id="view-PHP" style="display: none;">
+    <div class="table-card">
+      <h3>🥧 Graphic report <span class="badge-php">PHP</span> <span class="sub" id="pieSubPHP" style="font-weight:500;color:var(--text-3);font-size:11px;"></span></h3>
+      <div class="pie-grid">
+        <div class="pie-panel"><div class="pie-head"><span class="pt">💸 Expenses</span><span class="pv" id="pieTotExpPHP"></span></div><div id="pieExpPHP"></div></div>
+        <div class="pie-panel"><div class="pie-head"><span class="pt">🏦 Loans</span><span class="pv" id="pieTotLoanPHP"></span></div><div id="pieLoanPHP"></div></div>
+      </div>
+    </div>
+
     <div class="table-card">
       <h3>💸 Expenses ledger <span class="badge-php">PHP</span></h3>
       <div class="table-scroll">
@@ -505,6 +543,79 @@ tr:hover td.total-col { background: var(--sar-soft); }
     return html;
   }
 
+
+  // ---- Pie charts (inline SVG, follows year / month / search filters) ----
+  const PIE_COLORS = ['#0f9d7a','#2f6bdc','#e08a1e','#c2409b','#7c5cd6','#d1483e','#14a3b8','#8a9a2b'];
+  const PIE_OTHER = '#94a3a0';
+  const fmt = n => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function pieSlices(rows, month) {
+    let items = rows.map(r => ({ name: r.desc, value: month === 'ALL' ? r.total : r.months[month] }))
+                    .filter(i => i.value > 0).sort((a, b) => b.value - a.value);
+    if (items.length > PIE_COLORS.length + 1) {
+      const rest = items.slice(PIE_COLORS.length);
+      items = items.slice(0, PIE_COLORS.length);
+      items.push({ name: `Others (${rest.length})`, value: rest.reduce((t, i) => t + i.value, 0), other: true });
+    }
+    items.forEach((it, i) => it.color = it.other ? PIE_OTHER : PIE_COLORS[i]);
+    return items;
+  }
+
+  function buildPieHTML(items, cur) {
+    const total = items.reduce((t, i) => t + i.value, 0);
+    if (!total) return '<div class="pie-empty">No data for this period.</div>';
+    const cx = 100, cy = 100, r = 92;
+    let ang = -Math.PI / 2, shapes = '';
+    items.forEach((it, i) => {
+      const frac = it.value / total, label = `${esc(it.name)}: ${fmt(it.value)} ${cur} (${(frac * 100).toFixed(1)}%)`;
+      if (frac >= 0.9999) {
+        shapes += `<circle class="slice" data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${it.color}"><title>${label}</title></circle>`;
+      } else {
+        const a2 = ang + frac * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+        const x2 = cx + r * Math.cos(a2),  y2 = cy + r * Math.sin(a2);
+        shapes += `<path class="slice" data-i="${i}" fill="${it.color}" d="M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${frac > 0.5 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z"><title>${label}</title></path>`;
+        ang = a2;
+      }
+    });
+    const legend = items.map((it, i) =>
+      `<li data-i="${i}"><span class="dot" style="background:${it.color}"></span><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="am">${fmt(it.value)}</span><span class="pc">${(it.value / total * 100).toFixed(1)}%</span></li>`).join('');
+    return `<div class="pie-body"><svg class="pie-svg" viewBox="0 0 200 200" role="img" aria-label="Pie chart">${shapes}</svg><ul class="pie-legend">${legend}</ul></div>`;
+  }
+
+  function renderPie(id, totId, rows, month, cur) {
+    const items = pieSlices(rows, month);
+    document.getElementById(id).innerHTML = buildPieHTML(items, cur);
+    document.getElementById(totId).textContent = `${fmt(items.reduce((t, i) => t + i.value, 0))} ${cur}`;
+  }
+
+  // Hover on a slice or legend row highlights both
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('.pie-svg .slice, .pie-legend li');
+    document.querySelectorAll('.pie-body.has-hl').forEach(b => {
+      if (!el || !b.contains(el)) {
+        b.classList.remove('has-hl');
+        b.querySelectorAll('.hl').forEach(x => x.classList.remove('hl'));
+      }
+    });
+    if (!el) return;
+    const body = el.closest('.pie-body'), i = el.dataset.i;
+    body.classList.add('has-hl');
+    body.querySelectorAll('.hl').forEach(x => x.classList.remove('hl'));
+    body.querySelectorAll(`[data-i="${i}"]`).forEach(x => x.classList.add('hl'));
+  });
+
+  function renderPies(expSAR, expPHP, loanSAR, loanPHP, year, month) {
+    const mSel = document.getElementById('monthSelect');
+    const period = month === 'ALL' ? `Full year ${year}` : `${mSel.options[mSel.selectedIndex].text} ${year}`;
+    ['SAR', 'PHP'].forEach(c => document.getElementById('pieSub' + c).textContent = '· ' + period);
+    renderPie('pieExpSAR',  'pieTotExpSAR',  expSAR,  month, 'SAR');
+    renderPie('pieLoanSAR', 'pieTotLoanSAR', loanSAR, month, 'SAR');
+    renderPie('pieExpPHP',  'pieTotExpPHP',  expPHP,  month, 'PHP');
+    renderPie('pieLoanPHP', 'pieTotLoanPHP', loanPHP, month, 'PHP');
+  }
+
   function renderReports() {
     const year = document.getElementById('yearSelect').value;
     const month = document.getElementById('monthSelect').value;
@@ -519,6 +630,7 @@ tr:hover td.total-col { background: var(--sar-soft); }
     document.querySelector('#expenseTablePHP tbody').innerHTML = buildTableHTML(expDataPHP);
     document.querySelector('#loanTableSAR tbody').innerHTML = buildTableHTML(loanDataSAR);
     document.querySelector('#loanTablePHP tbody').innerHTML = buildTableHTML(loanDataPHP);
+    renderPies(expDataSAR, expDataPHP, loanDataSAR, loanDataPHP, year, month);
 
     // Smart search: if the active currency has no matches, hop to the other one;
     // if neither has matches, let the person know; if BOTH have matches, surface
