@@ -158,6 +158,24 @@ tr:hover td.total-col { background: var(--sar-soft); }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+.result-bubble {
+  position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow);
+  border-radius: 999px; padding: 7px 7px 7px 14px; display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; font-weight: 500; transition: all .2s; z-index: 21; max-width: 92vw;
+}
+.result-bubble.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.result-bubble .bubble-view {
+  background: var(--accent); color: #fff; border: none; border-radius: 999px; padding: 7px 13px;
+  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.result-bubble .bubble-view:hover { filter: brightness(1.08); }
+.result-bubble .bubble-close {
+  background: transparent; border: none; color: var(--text-3); font-size: 16px; line-height: 1;
+  cursor: pointer; padding: 4px; flex-shrink: 0;
+}
+.result-bubble .bubble-close:hover { color: var(--text); }
+
 @media (max-width: 760px) {
   .page { padding: 12px; }
   .header h2 { font-size: 14.5px; }
@@ -300,6 +318,12 @@ tr:hover td.total-col { background: var(--sar-soft); }
 
 <div class="toast" id="toast"></div>
 
+<div class="result-bubble" id="resultBubble">
+  <span id="bubbleText"></span>
+  <button class="bubble-view" id="bubbleViewBtn">View</button>
+  <button class="bubble-close" id="bubbleCloseBtn" aria-label="Dismiss">×</button>
+</div>
+
 <script>
   // ---- Theme (shares the 'pitaka-theme' key with the calculator app) ----
   (function () {
@@ -331,6 +355,25 @@ tr:hover td.total-col { background: var(--sar-soft); }
     document.getElementById('btn-SAR').classList.toggle('active', currency === 'SAR');
     document.getElementById('btn-PHP').classList.toggle('active', currency === 'PHP');
   }
+
+  // ---- Result bubble (shown when BOTH currencies have matches while searching) ----
+  let lastDismissedKeyword = null;
+  function showBubble(text, viewLabel) {
+    document.getElementById('bubbleText').textContent = text;
+    document.getElementById('bubbleViewBtn').textContent = viewLabel;
+    document.getElementById('resultBubble').classList.add('show');
+  }
+  function hideBubble() {
+    document.getElementById('resultBubble').classList.remove('show');
+  }
+  document.getElementById('bubbleCloseBtn').addEventListener('click', () => {
+    lastDismissedKeyword = document.getElementById('searchInput').value.toLowerCase().trim();
+    hideBubble();
+  });
+  document.getElementById('bubbleViewBtn').addEventListener('click', () => {
+    switchTab(activeCurrency === 'SAR' ? 'PHP' : 'SAR');
+    renderReports();
+  });
 
   const firebaseConfig = {
     apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
@@ -478,7 +521,9 @@ tr:hover td.total-col { background: var(--sar-soft); }
     document.querySelector('#loanTablePHP tbody').innerHTML = buildTableHTML(loanDataPHP);
 
     // Smart search: if the active currency has no matches, hop to the other one;
-    // if neither has matches, let the person know. Only kicks in while searching.
+    // if neither has matches, let the person know; if BOTH have matches, surface
+    // a bubble so they know there's more to see on the other tab. Only kicks in
+    // while searching.
     if (keyword) {
       const hasSAR = expDataSAR.length > 0 || loanDataSAR.length > 0;
       const hasPHP = expDataPHP.length > 0 || loanDataPHP.length > 0;
@@ -489,9 +534,25 @@ tr:hover td.total-col { background: var(--sar-soft); }
         const from = activeCurrency, to = activeCurrency === 'SAR' ? 'PHP' : 'SAR';
         switchTab(to);
         toast(`No matches in ${from} — showing ${to} instead`);
+        hideBubble();
       } else if (!activeHas && !otherHas) {
         toast('No results found');
+        hideBubble();
+      } else if (activeHas && otherHas) {
+        const other = activeCurrency === 'SAR' ? 'PHP' : 'SAR';
+        const otherCount = other === 'SAR'
+          ? expDataSAR.length + loanDataSAR.length
+          : expDataPHP.length + loanDataPHP.length;
+        if (keyword !== lastDismissedKeyword) {
+          showBubble(`✨ Matches also found in ${other} (${otherCount})`, `View ${other}`);
+        } else {
+          hideBubble();
+        }
+      } else {
+        hideBubble();
       }
+    } else {
+      hideBubble();
     }
   }
 </script>
