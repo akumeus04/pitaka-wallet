@@ -705,13 +705,19 @@
     .privacy-blur-toggle input:focus-visible + .pb-track { box-shadow: 0 0 0 3px var(--primary-glow); }
     .header-actions { display: flex; align-items: center; gap: 14px; }
 
-    #privacyBlurOverlay {
+#privacyBlurOverlay {
       position: fixed; inset: 0; z-index: 2147483647;
       background: rgba(240, 244, 248, 0.25);
       -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
       opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
     }
     body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
+
+    /* 🚨 Change overlay background to a dark tint when dark theme is active */
+    body.dark-theme body.privacy-blurred #privacyBlurOverlay,
+    body.dark-theme.privacy-blurred #privacyBlurOverlay {
+      background: rgba(12, 22, 20, 0.65);
+    }
 
     /* ── PRIVACY MODE: GOOGLE SCREEN ── */
     body.privacy-locked { background-color: #202124 !important; overflow: hidden; }
