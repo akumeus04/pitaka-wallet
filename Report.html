@@ -236,6 +236,7 @@ tr:hover td.total-col { background: var(--sar-soft); }
   opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
 }
 body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
+mark.hit { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -267,7 +268,7 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
         <label>Search keyword</label>
         <div class="input-wrap">
           <span class="ic">🔍</span>
-          <input type="text" id="searchInput" placeholder="e.g. Bank, Car, Rent…" oninput="renderReports()">
+          <input type="text" id="searchInput" placeholder="e.g. Bank, car loan, Rent…" oninput="renderReports()">
         </div>
       </div>
       <div class="form-group">
@@ -499,7 +500,60 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
     });
   }
 
-  function aggregateData(dataArray, targetYear, keyword, targetMonth, targetCurrency) {
+  // ---- Smart search helpers ----
+  // Ignores capitals, accents, spaces and punctuation ("car loan" = "car-loan" = "CarLoan"),
+  // matches any part of a word ("loan" finds "Sloan"), needs every typed word to match,
+  // and — only when nothing matches exactly — tolerates small typos ("loam" finds "loan").
+  const stripMarks = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const compact = s => stripMarks(s).replace(/[^\p{L}\p{N}]/gu, '');
+  const queryTokens = q => stripMarks(q).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+  function fuzzyHas(text, t) {
+    const m = t.length, k = m <= 3 ? 0 : (m <= 7 ? 1 : 2);
+    if (text.includes(t)) return true;
+    if (k === 0) return false;
+    let prev = Array.from({ length: m + 1 }, (_, i) => i);
+    for (let j = 0; j < text.length; j++) {
+      const cur = [0];
+      for (let i = 1; i <= m; i++) {
+        cur[i] = Math.min(prev[i] + 1, cur[i - 1] + 1, prev[i - 1] + (t[i - 1] === text[j] ? 0 : 1));
+      }
+      if (cur[m] <= k) return true;
+      prev = cur;
+    }
+    return false;
+  }
+
+  function matchesQuery(fields, keyword, fuzzy) {
+    const tokens = queryTokens(keyword);
+    if (!tokens.length) return true;
+    const text = compact(fields.join(' '));
+    return tokens.every(t => fuzzy ? fuzzyHas(text, t) : text.includes(t));
+  }
+
+  let activeQuery = '';
+  function highlight(desc) {
+    const raw = String(desc);
+    const tokens = queryTokens(activeQuery);
+    if (!tokens.length) return esc(raw);
+    const flat = stripMarks(raw);                       // same length as raw for plain text
+    if (flat.length !== raw.length) return esc(raw);
+    const ranges = [];
+    tokens.forEach(t => {
+      const pat = [...t].map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^\\p{L}\\p{N}]*');
+      const re = new RegExp(pat, 'gu'); let m;
+      while ((m = re.exec(flat)) && m[0].length) ranges.push([m.index, m.index + m[0].length]);
+    });
+    if (!ranges.length) return esc(raw);
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [ranges[0].slice()];
+    ranges.slice(1).forEach(r => { const l = merged[merged.length - 1]; if (r[0] <= l[1]) l[1] = Math.max(l[1], r[1]); else merged.push(r.slice()); });
+    let out = '', pos = 0;
+    merged.forEach(([a, b]) => { out += esc(raw.slice(pos, a)) + '<mark class="hit">' + esc(raw.slice(a, b)) + '</mark>'; pos = b; });
+    return out + esc(raw.slice(pos));
+  }
+
+  function aggregateData(dataArray, targetYear, keyword, targetMonth, targetCurrency, fuzzy) {
     const grouped = {};
 
     dataArray.forEach(item => {
@@ -519,8 +573,8 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
       const descMatch = rawDesc.match(/(.*?)\s*\(\d+\/\d+\)$/);
       if (descMatch) cleanDesc = descMatch[1].trim();
 
-      const notes = item["Notes"] || item.notes || "";
-      if (keyword && !cleanDesc.toLowerCase().includes(keyword) && !notes.toLowerCase().includes(keyword)) {
+      const notes = String(item["Notes"] || item.notes || "");
+      if (keyword && !matchesQuery([cleanDesc, notes], keyword, fuzzy)) {
         return;
       }
 
@@ -554,7 +608,7 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
     const grandTotals = { "01":0, "02":0, "03":0, "04":0, "05":0, "06":0, "07":0, "08":0, "09":0, "10":0, "11":0, "12":0, total: 0 };
 
     aggregatedData.forEach(row => {
-      html += `<tr><td>${row.desc}</td>`;
+      html += `<tr><td>${highlight(row.desc)}</td>`;
 
       for (let m = 1; m <= 12; m++) {
         let mStr = String(m).padStart(2, '0');
@@ -656,10 +710,21 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
     const month = document.getElementById('monthSelect').value;
     const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
 
-    const expDataSAR = aggregateData(rawExpenses, year, keyword, month, "SAR");
-    const expDataPHP = aggregateData(rawExpenses, year, keyword, month, "PHP");
-    const loanDataSAR = aggregateData(rawLoans, year, keyword, month, "SAR");
-    const loanDataPHP = aggregateData(rawLoans, year, keyword, month, "PHP");
+    activeQuery = keyword;
+    const run = fuzzy => [
+      aggregateData(rawExpenses, year, keyword, month, "SAR", fuzzy),
+      aggregateData(rawExpenses, year, keyword, month, "PHP", fuzzy),
+      aggregateData(rawLoans, year, keyword, month, "SAR", fuzzy),
+      aggregateData(rawLoans, year, keyword, month, "PHP", fuzzy)
+    ];
+    let results = run(false), usedFuzzy = false;
+    // nothing matched exactly -> retry forgiving small typos
+    if (keyword && results.every(r => r.length === 0)) {
+      const alt = run(true);
+      if (alt.some(r => r.length > 0)) { results = alt; usedFuzzy = true; }
+    }
+    const [expDataSAR, expDataPHP, loanDataSAR, loanDataPHP] = results;
+    const tabBefore = activeCurrency;
 
     document.querySelector('#expenseTableSAR tbody').innerHTML = buildTableHTML(expDataSAR);
     document.querySelector('#expenseTablePHP tbody').innerHTML = buildTableHTML(expDataPHP);
@@ -701,6 +766,8 @@ body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
     } else {
       hideBubble();
     }
+
+    if (usedFuzzy && activeCurrency === tabBefore) toast(`Showing close matches for “${keyword}”`);
   }
 </script>
 
