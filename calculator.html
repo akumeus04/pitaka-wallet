@@ -80,6 +80,18 @@ button, input, textarea { font-family: inherit; color: inherit; }
 }
 .icon-btn:hover { background: var(--key-hover); }
 .icon-btn.spin { animation: spin .7s linear; }
+.icon-btn.on { background: var(--accent); border-color: transparent; }
+
+/* ── Privacy shield: blurs the whole page when the mouse leaves ── */
+#privacyShield {
+  position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  opacity: 0; visibility: hidden; transition: opacity .12s, visibility .12s;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+}
+#privacyShield.show { opacity: 1; visibility: visible; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
   .note-tab span:first-child {
@@ -160,6 +172,22 @@ button, input, textarea { font-family: inherit; color: inherit; }
 .keys .op.active { background: var(--sar); color: var(--card); }
 .keys .eq { background: var(--sar); color: #fff; border-color: transparent; }
 .keys .eq:hover { filter: brightness(1.08); background: var(--sar); }
+
+/* ── Calculation history ── */
+.hist { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.hist-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.hist-head h3 { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.hist-head .text-btn { flex: none; padding: 4px 10px; }
+.hist-list { max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.hist-item {
+  text-align: right; padding: 6px 10px; border-radius: 9px; cursor: pointer;
+  background: var(--key); border: 1px solid transparent; font-family: var(--mono);
+}
+.hist-item:hover { border-color: var(--accent); }
+.hist-item .ex { font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
+.hist-item .rs { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.hist-item .tm { font-size: 9.5px; color: var(--text-3); font-family: var(--font); }
+.hist-empty { font-size: 11px; color: var(--text-3); text-align: center; padding: 10px 0; }
 
 /* ── Notes ── */
 .notes-card { display: flex; flex-direction: column; min-height: 600px; min-width: 0; }
@@ -293,6 +321,7 @@ table.grid td[contenteditable]:focus { background: var(--php-soft); }
       <div class="head">
         <h2>Currency converter</h2>
         <div class="head-actions">
+          <button class="icon-btn" id="privacyBtn" title="Privacy blur: off" aria-label="Toggle privacy blur" aria-pressed="false">🙈</button>
           <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌓</button>
           <button class="icon-btn" id="refreshBtn" title="Refresh rate" aria-label="Refresh rate">↻</button>
         </div>
@@ -349,6 +378,14 @@ table.grid td[contenteditable]:focus { background: var(--php-soft); }
       <div class="conv-actions">
         <button class="text-btn" id="toConvBtn">Send to converter</button>
       </div>
+
+      <div class="hist">
+        <div class="hist-head">
+          <h3>🕘 History <span class="meta" id="histCount"></span></h3>
+          <button class="text-btn" id="histClearBtn" disabled>Clear</button>
+        </div>
+        <div class="hist-list" id="histList"><div class="hist-empty">Sign in to see history</div></div>
+      </div>
     </section>
   </div>
 
@@ -381,6 +418,7 @@ table.grid td[contenteditable]:focus { background: var(--php-soft); }
 
 </div>
 <div class="toast" id="toast"></div>
+<div id="privacyShield" aria-hidden="true"></div>
 
 <div class="modal-overlay" id="cropModal">
   <div class="modal-box">
@@ -441,6 +479,39 @@ $('themeBtn').addEventListener('click', () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next; store('pitaka-theme', next);
 });
+
+// ==========================================
+// PRIVACY BLUR — blur everything when the mouse leaves the page
+// (or the window loses focus); clears when the mouse comes back.
+// ==========================================
+(function () {
+  const btn = $('privacyBtn'), shield = $('privacyShield');
+  let enabled = store('pitaka-privacy') === 'on';
+  let shown = false;
+  function setShield(on) {
+    if (on === shown) return;
+    shown = on; shield.classList.toggle('show', on);
+  }
+  function syncBtn() {
+    btn.classList.toggle('on', enabled);
+    btn.setAttribute('aria-pressed', enabled);
+    btn.title = 'Privacy blur: ' + (enabled ? 'on' : 'off');
+  }
+  btn.addEventListener('click', () => {
+    enabled = !enabled; store('pitaka-privacy', enabled ? 'on' : 'off');
+    syncBtn(); if (!enabled) setShield(false);
+    toast(enabled ? 'Privacy blur on — page blurs when the mouse leaves' : 'Privacy blur off');
+  });
+  document.documentElement.addEventListener('mouseleave', () => { if (enabled) setShield(true); });
+  window.addEventListener('blur', () => { if (enabled) setShield(true); });
+  ['mouseenter', 'focus'].forEach(ev => {
+    document.documentElement.addEventListener(ev, () => setShield(false));
+  });
+  window.addEventListener('focus', () => setShield(false));
+  document.addEventListener('mousemove', () => { if (shown) setShield(false); }, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (enabled && document.hidden) setShield(true); });
+  syncBtn();
+})();
 
 // ==========================================
 // CONVERTER
@@ -557,8 +628,50 @@ function compute(chain) {
     case '*': r = a * b; break; case '/': r = b === 0 ? null : a / b; break;
   }
   if (r === null) { cur = 'Error'; prevStr = ''; op = null; render(); return; }
-  cur = tidy(r); prevStr = ''; op = null; justComputed = !chain; render();
+  cur = tidy(r); addHistory(a, op, b, cur); prevStr = ''; op = null; justComputed = !chain; render();
 }
+// ---- Calculation history (saved in Firebase: calcHistory) ----
+const HIST_SHOW = 30, HIST_KEEP = 50;
+function addHistory(a, o, b, result) {
+  if (!loggedIn) return;
+  db.ref('calcHistory').push({
+    expr: `${withCommas(String(a))} ${symbols[o]} ${withCommas(String(b))}`,
+    result: String(result), at: Date.now()
+  }).catch(() => toast('Could not save history'));
+}
+function renderHistory(items) {
+  const list = $('histList');
+  $('histClearBtn').disabled = !loggedIn || items.length === 0;
+  $('histCount').textContent = items.length ? `(${items.length})` : '';
+  list.innerHTML = '';
+  if (!loggedIn) { list.innerHTML = '<div class="hist-empty">Sign in to see history</div>'; return; }
+  if (!items.length) { list.innerHTML = '<div class="hist-empty">No calculations yet</div>'; return; }
+  items.slice(0, HIST_SHOW).forEach(it => {
+    const d = document.createElement('div'); d.className = 'hist-item'; d.title = 'Click to use this result';
+    const ex = document.createElement('div'); ex.className = 'ex'; ex.textContent = it.expr + ' =';
+    const rs = document.createElement('div'); rs.className = 'rs'; rs.textContent = withCommas(it.result);
+    const tm = document.createElement('div'); tm.className = 'tm';
+    tm.textContent = new Date(it.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    d.append(ex, rs, tm);
+    d.addEventListener('click', () => { cur = it.result; prevStr = ''; op = null; justComputed = false; render(); toast('Loaded ' + withCommas(it.result)); });
+    list.appendChild(d);
+  });
+}
+function startHistoryListener() {
+  db.ref('calcHistory').on('value', snap => {
+    const items = [];
+    snap.forEach(c => { const v = c.val(); if (v && v.result !== undefined) items.push({ key: c.key, ...v }); });
+    items.sort((x, y) => (y.at || 0) - (x.at || 0));
+    renderHistory(items);
+    items.slice(HIST_KEEP).forEach(it => db.ref('calcHistory/' + it.key).remove()); // keep storage small
+  });
+}
+$('histClearBtn').addEventListener('click', () => {
+  if (!loggedIn) return;
+  if (!confirm('Clear all calculation history?')) return;
+  db.ref('calcHistory').remove().then(() => toast('History cleared')).catch(() => toast('Could not clear history'));
+});
+
 function clearAll() { cur = ''; prevStr = ''; op = null; justComputed = false; render(); }
 function del() { if (justComputed || cur === 'Error') return clearAll(); cur = cur.slice(0, -1); render(); }
 function negate() { if (!cur || cur === 'Error') return; cur = cur.startsWith('-') ? cur.slice(1) : '-' + cur; render(); }
@@ -590,6 +703,25 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Backspace') del();
   else if (e.key === 'Escape') clearAll();
   else if (e.key === '%') percent();
+});
+
+// Paste a copied number straight into the calculator (Ctrl/Cmd+V).
+// Ignored while typing in a field, so the converter and notes paste normally.
+document.addEventListener('paste', e => {
+  const ae = document.activeElement, tag = ae.tagName.toLowerCase();
+  if (tag === 'textarea' || tag === 'input' || ae.isContentEditable) return;
+  if ($('cropModal').classList.contains('show')) return;
+  const text = (e.clipboardData && e.clipboardData.getData('text')) || '';
+  const m = text.replace(/\s/g, '').match(/-?(\d[\d,]*\.?\d*|\.\d+)/);
+  e.preventDefault();
+  if (!m) return toast('No number found in clipboard');
+  let v = m[0].replace(/,/g, '');
+  if (v.startsWith('.')) v = '0' + v;
+  else if (v.startsWith('-.')) v = '-0' + v.slice(1);
+  if (v.endsWith('.')) v = v.slice(0, -1);
+  if (v.replace(/[-.]/g, '').length > 15) return toast('Number is too long');
+  cur = v; justComputed = false; render();
+  toast('Pasted ' + withCommas(v));
 });
 render();
 
@@ -1007,6 +1139,7 @@ auth.onAuthStateChanged(user => {
   updateAuthUI();
   if (loggedIn) {
     setStatus('Synced', 'ok');
+    startHistoryListener();
     db.ref('notesIndex').on('value', snap => {
       notesIndexCache = snap.val() || {};
       renderTabs();
@@ -1022,6 +1155,7 @@ auth.onAuthStateChanged(user => {
     setStatus('Not signed in', 'err');
     if (noteRef) noteRef.off();
     db.ref('notesIndex').off();
+    db.ref('calcHistory').off(); renderHistory([]);
     blocksEl.innerHTML = '<div class="block text-block"><textarea readonly placeholder="Sign in to view your notes"></textarea></div>';
   }
 });
