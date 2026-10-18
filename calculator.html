@@ -82,6 +82,16 @@ button, input, textarea { font-family: inherit; color: inherit; }
 .icon-btn.spin { animation: spin .7s linear; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+  .note-tab span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-tab .x {
+  flex-shrink: 0;
+}
+
 /* ── Converter ── */
 .rate-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .rate-big { font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
