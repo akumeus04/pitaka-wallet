@@ -206,6 +206,36 @@ tr:hover td.total-col { background: var(--sar-soft); }
   .controls-card { flex-direction: column; align-items: stretch; }
   .form-group { min-width: 0; }
 }
+
+/* ── PRIVACY BLUR TOGGLE ── */
+.privacy-blur-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; user-select: none; white-space: nowrap;
+  text-transform: none; letter-spacing: 0; margin: 0;
+}
+.privacy-blur-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.privacy-blur-toggle .pb-track {
+  position: relative; width: 34px; height: 19px; border-radius: 999px;
+  background: var(--border); transition: background 0.2s;
+}
+.privacy-blur-toggle .pb-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.2s;
+}
+.privacy-blur-toggle input:checked + .pb-track { background: var(--accent); }
+.privacy-blur-toggle input:checked + .pb-track::after { transform: translateX(15px); }
+.privacy-blur-toggle input:focus-visible + .pb-track { box-shadow: 0 0 0 3px var(--sar-soft); }
+@media (max-width: 640px) { .privacy-blur-toggle .pb-lbl { display: none; } }
+
+#privacyBlurOverlay {
+  position: fixed; inset: 0; z-index: 2147483647;
+  background: rgba(128, 140, 136, 0.18);
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
+}
+body.privacy-blurred #privacyBlurOverlay { opacity: 1; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -222,6 +252,11 @@ tr:hover td.total-col { background: var(--sar-soft); }
         </div>
       </div>
       <div class="header-actions">
+        <label class="privacy-blur-toggle" title="Blur the page when the mouse leaves or the window loses focus">
+          <input type="checkbox" id="privacyBlurToggle">
+          <span class="pb-track"></span>
+          <span class="pb-lbl">🙈 Privacy blur</span>
+        </label>
         <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌓</button>
         <a href="index.html" class="btn">⬅ <span class="lbl">Back to Dashboard</span></a>
       </div>
@@ -667,6 +702,47 @@ tr:hover td.total-col { background: var(--sar-soft); }
       hideBubble();
     }
   }
+</script>
+
+<div id="privacyBlurOverlay" aria-hidden="true"></div>
+<script>
+  // Privacy blur: shares the same on/off setting as the dashboard (index.html).
+  (function () {
+    const KEY = 'pitakaPrivacyBlur';
+    const toggle = document.getElementById('privacyBlurToggle');
+    let enabled = false, mouseInside = true, windowFocused = true;
+
+    try { enabled = localStorage.getItem(KEY) === '1'; } catch (e) {}
+    toggle.checked = enabled;
+
+    function update() {
+      const away = document.hidden || !windowFocused || !mouseInside;
+      document.body.classList.toggle('privacy-blurred', enabled && away);
+    }
+
+    toggle.addEventListener('change', function () {
+      enabled = toggle.checked;
+      try { localStorage.setItem(KEY, enabled ? '1' : '0'); } catch (e) {}
+      mouseInside = true;
+      windowFocused = document.hasFocus();
+      update();
+    });
+
+    // keep in sync if toggled in another open tab (e.g. the dashboard)
+    window.addEventListener('storage', function (e) {
+      if (e.key !== KEY) return;
+      enabled = e.newValue === '1';
+      toggle.checked = enabled;
+      update();
+    });
+
+    document.documentElement.addEventListener('mouseleave', function () { mouseInside = false; update(); });
+    document.documentElement.addEventListener('mouseenter', function () { mouseInside = true; update(); });
+    document.addEventListener('mousemove', function () { if (!mouseInside) { mouseInside = true; update(); } }, { passive: true });
+    window.addEventListener('blur', function () { windowFocused = false; update(); });
+    window.addEventListener('focus', function () { windowFocused = true; update(); });
+    document.addEventListener('visibilitychange', update);
+  })();
 </script>
 </body>
 </html>
