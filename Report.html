@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detailed Ledger Report</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #eef2f1;
+  --card: #ffffff;
+  --text: #10231f;
+  --text-2: #4b5f5a;
+  --text-3: #8a9c97;
+  --border: #dce4e2;
+  --key: #f2f5f4;
+  --key-hover: #e6ecea;
+  --sar: #0f7b5f;
+  --sar-soft: #e3f4ee;
+  --php: #2456c5;
+  --php-soft: #e6edfb;
+  --accent: #0f7b5f;
+  --danger: #c62828;
+  --warning: #b36b00;
+  --shadow: 0 1px 2px rgba(16,35,31,.06), 0 8px 24px -12px rgba(16,35,31,.18);
+  --font: 'Sora', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #0c1614;
+  --card: #142220;
+  --text: #e6f0ed;
+  --text-2: #a3b7b1;
+  --text-3: #6b807a;
+  --border: #243633;
+  --key: #1b2c29;
+  --key-hover: #243836;
+  --sar: #3ccf9f;
+  --sar-soft: #12332b;
+  --php: #7ea6ff;
+  --php-soft: #16264d;
+  --accent: #3ccf9f;
+  --danger: #ff7b72;
+  --warning: #e3a84f;
+  --shadow: 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); }
+body {
+  margin: 0; font-family: var(--font); color: var(--text); font-size: 13px;
+}
+button, input, select { font-family: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: inherit; }
+
+.page { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+/* ── Sticky controls ── */
+.sticky-bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 2px; padding-bottom: 12px; }
+
+.header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.header-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.header-title .ico {
+  width: 34px; height: 34px; border-radius: 10px; background: var(--sar-soft); color: var(--sar);
+  display: grid; place-items: center; font-size: 16px; flex-shrink: 0;
+}
+.header h2 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header .sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.icon-btn {
+  border: 1px solid var(--border); background: var(--card); border-radius: 10px;
+  width: 36px; height: 36px; cursor: pointer; font-size: 15px; line-height: 1;
+  display: grid; place-items: center; transition: background .15s;
+}
+.icon-btn:hover { background: var(--key-hover); }
+.btn {
+  background: var(--accent); color: #fff; border: none; padding: 9px 14px; border-radius: 10px;
+  cursor: pointer; font-weight: 600; text-decoration: none; font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.08); }
+
+.controls-card {
+  background: var(--card); padding: 14px; border-radius: 14px; border: 1px solid var(--border);
+  box-shadow: var(--shadow); margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+}
+.form-group { display: flex; flex-direction: column; flex: 1; min-width: 150px; }
+.form-group label { font-size: 10.5px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 5px; }
+.form-group .input-wrap { position: relative; }
+.form-group .input-wrap .ic { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 13px; pointer-events: none; }
+.form-group input, .form-group select {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--key); color: var(--text); outline: none; font-family: var(--font); font-size: 13px;
+  min-height: 42px; transition: border-color .15s, background .15s; appearance: none;
+}
+.form-group input#searchInput { padding-left: 32px; }
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); background: var(--card); }
+.form-group select { background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
+
+/* ── Currency tabs ── */
+.currency-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--card); padding: 6px; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.tab-btn {
+  background: transparent; border: none; padding: 11px 10px; border-radius: 10px; font-weight: 600;
+  cursor: pointer; color: var(--text-2); font-family: var(--font); font-size: 13px; transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px;
+}
+.tab-btn:hover { background: var(--key); color: var(--text); }
+#btn-SAR.active { background: var(--sar); color: #fff; }
+#btn-PHP.active { background: var(--php); color: #fff; }
+
+/* ── Tables ── */
+.table-card { background: var(--card); padding: 14px; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 16px; }
+.table-card h3 { margin: 0 0 10px; font-size: 14px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.badge-sar, .badge-php { padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; }
+.badge-sar { background: var(--sar-soft); color: var(--sar); }
+.badge-php { background: var(--php-soft); color: var(--php); }
+
+.table-scroll { position: relative; overflow-x: auto; border-radius: 10px; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+th { text-align: right; background: var(--key); color: var(--text-2); font-family: var(--font); font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; font-weight: 700; }
+th:first-child, td:first-child {
+  text-align: left; font-family: var(--font); font-weight: 600; white-space: normal;
+  position: sticky; left: 0; background: var(--card); z-index: 2; min-width: 130px;
+  box-shadow: 1px 0 0 var(--border);
+}
+th:first-child { background: var(--key); z-index: 3; }
+tr:hover td { background: var(--key); }
+tr:hover td:first-child { background: var(--key); }
+
+.total-col { font-weight: 700; color: var(--accent); background: var(--sar-soft); }
+th.total-col {
+  position: sticky; right: 0; background: var(--key); z-index: 3; box-shadow: -1px 0 0 var(--border);
+}
+td.total-col { position: sticky; right: 0; z-index: 1; box-shadow: -1px 0 0 var(--border); }
+tr:hover td.total-col { background: var(--sar-soft); }
+
+.grand-total-row td { font-weight: 700; font-size: 12.5px; color: var(--text); border-top: 2px solid var(--border); background: var(--key); }
+.grand-total-row td:first-child { background: var(--key); }
+.grand-total-row td.total-col { background: var(--sar-soft); }
+.empty-cell { color: var(--text-3); opacity: .5; }
+
+.scroll-hint { font-size: 10.5px; color: var(--text-3); display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0;
+  background: var(--text); color: var(--card); padding: 10px 16px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 500; pointer-events: none; transition: all .2s; z-index: 20;
+  max-width: 90vw; text-align: center; box-shadow: var(--shadow);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 760px) {
+  .page { padding: 12px; }
+  .header h2 { font-size: 14.5px; }
+  .btn span.lbl { display: none; }
+  .btn { padding: 9px 11px; }
+  .controls-card { flex-direction: column; align-items: stretch; }
+  .form-group { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="sticky-bar">
+    <div class="header">
+      <div class="header-title">
+        <div class="ico">📊</div>
+        <div>
+          <h2>Annual Ledger Report</h2>
+          <div class="sub">Expenses &amp; loans, unified</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">🌓</button>
+        <a href="index.html" class="btn">⬅ <span class="lbl">Back to Dashboard</span></a>
+      </div>
+    </div>
+
+    <div class="controls-card">
+      <div class="form-group">
+        <label>Search keyword</label>
+        <div class="input-wrap">
+          <span class="ic">🔍</span>
+          <input type="text" id="searchInput" placeholder="e.g. Bank, Car, Rent…" oninput="renderReports()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Year</label>
+        <select id="yearSelect" onchange="renderReports()"></select>
+      </div>
+      <div class="form-group">
+        <label>Month focus</label>
+        <select id="monthSelect" onchange="renderReports()">
+          <option value="ALL">Show all 12 months</option>
+          <option value="01">January</option><option value="02">February</option>
+          <option value="03">March</option><option value="04">April</option>
+          <option value="05">May</option><option value="06">June</option>
+          <option value="07">July</option><option value="08">August</option>
+          <option value="09">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="currency-tabs">
+      <button class="tab-btn active" id="btn-SAR" onclick="switchTab('SAR')">🇸🇦 SAR Ledgers</button>
+      <button class="tab-btn" id="btn-PHP" onclick="switchTab('PHP')">🇵🇭 PHP Ledgers</button>
+    </div>
+  </div>
+
+  <!-- ==================== SAR PAGE VIEW ==================== -->
+  <div id="view-SAR">
+    <div class="table-card">
+      <h3>💸 Expenses ledger <span class="badge-sar">SAR</span></h3>
+      <div class="table-scroll">
+        <table id="expenseTableSAR">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+              <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+              <th class="total-col">Year total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="scroll-hint">↔ Swipe sideways to see every month</div>
+    </div>
+
+    <div class="table-card">
+      <h3>🏦 Loans ledger <span class="badge-sar">SAR</span></h3>
+      <div class="table-scroll">
+        <table id="loanTableSAR">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+              <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+              <th class="total-col">Year total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="scroll-hint">↔ Swipe sideways to see every month</div>
+    </div>
+  </div>
+
+  <!-- ==================== PHP PAGE VIEW ==================== -->
+  <div id="view-PHP" style="display: none;">
+    <div class="table-card">
+      <h3>💸 Expenses ledger <span class="badge-php">PHP</span></h3>
+      <div class="table-scroll">
+        <table id="expenseTablePHP">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+              <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+              <th class="total-col">Year total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="scroll-hint">↔ Swipe sideways to see every month</div>
+    </div>
+
+    <div class="table-card">
+      <h3>🏦 Loans ledger <span class="badge-php">PHP</span></h3>
+      <div class="table-scroll">
+        <table id="loanTablePHP">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th>
+              <th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+              <th class="total-col">Year total</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="scroll-hint">↔ Swipe sideways to see every month</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---- Theme (shares the 'pitaka-theme' key with the calculator app) ----
+  (function () {
+    const saved = localStorage.getItem('pitaka-theme');
+    const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('pitaka-theme', next); } catch (e) {}
+  });
+
+  // ---- Toast ----
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // View Switcher Logic
+  let activeCurrency = 'SAR';
+  function switchTab(currency) {
+    activeCurrency = currency;
+    document.getElementById('view-SAR').style.display = currency === 'SAR' ? 'block' : 'none';
+    document.getElementById('view-PHP').style.display = currency === 'PHP' ? 'block' : 'none';
+    document.getElementById('btn-SAR').classList.toggle('active', currency === 'SAR');
+    document.getElementById('btn-PHP').classList.toggle('active', currency === 'PHP');
+  }
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
+    databaseURL: "https://finance-app-23309-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let rawExpenses = [];
+  let rawLoans = [];
+
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      db.ref('expenses').on('value', snap => {
+        rawExpenses = [];
+        snap.forEach(child => { rawExpenses.push({ id: child.key, ...child.val() }); });
+        populateYearDropdown();
+        renderReports();
+      });
+      db.ref('loans').on('value', snap => {
+        rawLoans = [];
+        snap.forEach(child => { rawLoans.push({ id: child.key, ...child.val() }); });
+        populateYearDropdown();
+        renderReports();
+      });
+    } else {
+      window.location.href = "index.html";
+    }
+  });
+
+  function populateYearDropdown() {
+    const select = document.getElementById('yearSelect');
+    if (select.options.length > 0) return;
+
+    const currentYear = new Date().getFullYear();
+    let years = new Set([currentYear, currentYear - 1, currentYear + 1]);
+
+    [...rawExpenses, ...rawLoans].forEach(item => {
+      const monthVal = item["Start Month"] || item.startMonth;
+      if (monthVal) {
+        years.add(parseInt(String(monthVal).trim().substring(0, 4)));
+      }
+    });
+
+    Array.from(years).sort().reverse().forEach(year => {
+      let opt = document.createElement('option');
+      opt.value = year; opt.innerText = year;
+      if (year === currentYear) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function aggregateData(dataArray, targetYear, keyword, targetMonth, targetCurrency) {
+    const grouped = {};
+
+    dataArray.forEach(item => {
+      const status = item["Status"] || item.status || "";
+      if (status === "Cancelled") return;
+
+      const currency = String(item["Currency"] || item.currency || "SAR").trim().toUpperCase();
+      if (currency !== targetCurrency) return;
+
+      const startMonthStr = String(item["Start Month"] || item.startMonth || "").trim();
+      if (!startMonthStr.startsWith(targetYear)) return;
+
+      const monthNum = startMonthStr.substring(5, 7);
+
+      let rawDesc = item["Description"] || item.description || "";
+      let cleanDesc = rawDesc;
+      const descMatch = rawDesc.match(/(.*?)\s*\(\d+\/\d+\)$/);
+      if (descMatch) cleanDesc = descMatch[1].trim();
+
+      const notes = item["Notes"] || item.notes || "";
+      if (keyword && !cleanDesc.toLowerCase().includes(keyword) && !notes.toLowerCase().includes(keyword)) {
+        return;
+      }
+
+      const amount = parseFloat(item["Total Amount"]) ||
+                     parseFloat(item.totalAmount) ||
+                     parseFloat(item["Monthly Deduction (SAR)"]) ||
+                     parseFloat(item.monthlyDeduction) || 0;
+
+      if (!grouped[cleanDesc]) {
+        grouped[cleanDesc] = { desc: cleanDesc, months: { "01":0, "02":0, "03":0, "04":0, "05":0, "06":0, "07":0, "08":0, "09":0, "10":0, "11":0, "12":0 }, total: 0 };
+      }
+
+      grouped[cleanDesc].months[monthNum] += amount;
+      grouped[cleanDesc].total += amount;
+    });
+
+    let resultList = Object.values(grouped);
+    if (targetMonth !== "ALL") {
+      resultList = resultList.filter(row => row.months[targetMonth] > 0);
+    }
+
+    return resultList.sort((a, b) => b.total - a.total);
+  }
+
+  function buildTableHTML(aggregatedData) {
+    if (aggregatedData.length === 0) {
+      return `<tr><td colspan="14" style="text-align:center; padding: 24px; color: var(--text-3); position: static;">No matching records found for this period.</td></tr>`;
+    }
+
+    let html = "";
+    const grandTotals = { "01":0, "02":0, "03":0, "04":0, "05":0, "06":0, "07":0, "08":0, "09":0, "10":0, "11":0, "12":0, total: 0 };
+
+    aggregatedData.forEach(row => {
+      html += `<tr><td>${row.desc}</td>`;
+
+      for (let m = 1; m <= 12; m++) {
+        let mStr = String(m).padStart(2, '0');
+        let val = row.months[mStr];
+        grandTotals[mStr] += val;
+        html += val > 0 ? `<td>${val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>` : `<td class="empty-cell">-</td>`;
+      }
+
+      grandTotals.total += row.total;
+      html += `<td class="total-col">${row.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>`;
+    });
+
+    html += `<tr class="grand-total-row"><td>GRAND TOTAL</td>`;
+    for (let m = 1; m <= 12; m++) {
+      let mStr = String(m).padStart(2, '0');
+      let val = grandTotals[mStr];
+      html += val > 0 ? `<td>${val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>` : `<td class="empty-cell">-</td>`;
+    }
+    html += `<td class="total-col">${grandTotals.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>`;
+
+    return html;
+  }
+
+  function renderReports() {
+    const year = document.getElementById('yearSelect').value;
+    const month = document.getElementById('monthSelect').value;
+    const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+
+    const expDataSAR = aggregateData(rawExpenses, year, keyword, month, "SAR");
+    const expDataPHP = aggregateData(rawExpenses, year, keyword, month, "PHP");
+    const loanDataSAR = aggregateData(rawLoans, year, keyword, month, "SAR");
+    const loanDataPHP = aggregateData(rawLoans, year, keyword, month, "PHP");
+
+    document.querySelector('#expenseTableSAR tbody').innerHTML = buildTableHTML(expDataSAR);
+    document.querySelector('#expenseTablePHP tbody').innerHTML = buildTableHTML(expDataPHP);
+    document.querySelector('#loanTableSAR tbody').innerHTML = buildTableHTML(loanDataSAR);
+    document.querySelector('#loanTablePHP tbody').innerHTML = buildTableHTML(loanDataPHP);
+
+    // Smart search: if the active currency has no matches, hop to the other one;
+    // if neither has matches, let the person know. Only kicks in while searching.
+    if (keyword) {
+      const hasSAR = expDataSAR.length > 0 || loanDataSAR.length > 0;
+      const hasPHP = expDataPHP.length > 0 || loanDataPHP.length > 0;
+      const activeHas = activeCurrency === 'SAR' ? hasSAR : hasPHP;
+      const otherHas = activeCurrency === 'SAR' ? hasPHP : hasSAR;
+
+      if (!activeHas && otherHas) {
+        const from = activeCurrency, to = activeCurrency === 'SAR' ? 'PHP' : 'SAR';
+        switchTab(to);
+        toast(`No matches in ${from} — showing ${to} instead`);
+      } else if (!activeHas && !otherHas) {
+        toast('No results found');
+      }
+    }
+  }
+</script>
+</body>
+</html>
