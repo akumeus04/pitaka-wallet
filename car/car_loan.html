@@ -317,15 +317,20 @@
 </head>
 <body>
 
-    <div id="loginOverlay" class="login-overlay">
-        <div class="login-box">
-            <h2>Sign In</h2>
-<button type="button" id="googleLoginBtn" class="btn-primary" onclick="window.handleGoogleLogin()" style="background: #ffffff; color: #3c4043; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" style="width: 20px; height: 20px;">
-    Sign in with Google
-</button>
-        </div>
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+        <h2>Sign In</h2>
+        
+        <!-- Must have id="loginError" -->
+        <div id="loginError" class="login-error"></div>
+
+        <!-- Must have id="googleLoginBtn" -->
+        <button type="button" id="googleLoginBtn" class="btn-primary" onclick="window.handleGoogleLogin()" style="background: #ffffff; color: #3c4043; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" style="width: 20px; height: 20px;">
+            Sign in with Google
+        </button>
     </div>
+</div>
 
     <!-- ══ SETTINGS DRAWER (burger menu) ══ -->
     <div class="drawer-overlay" id="drawerOverlay" onclick="window.closeDrawer()"></div>
@@ -508,17 +513,25 @@ window.handleGoogleLogin = async function() {
     const btn = document.getElementById('googleLoginBtn');
     const errDiv = document.getElementById('loginError');
     
-    btn.innerHTML = 'Verifying...'; 
-    btn.disabled = true; 
-    errDiv.style.display = 'none';
+    if (btn) {
+        btn.innerHTML = 'Verifying...'; 
+        btn.disabled = true; 
+    }
+    if (errDiv) {
+        errDiv.style.display = 'none';
+    }
     
     try { 
         await signInWithPopup(auth, provider); 
     } catch (error) { 
-        errDiv.textContent = 'Authentication failed: ' + error.message; 
-        errDiv.style.display = 'block'; 
-        btn.innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px; height: 20px;"> Sign in with Google`;
-        btn.disabled = false;
+        if (errDiv) {
+            errDiv.textContent = 'Authentication failed: ' + error.message; 
+            errDiv.style.display = 'block'; 
+        }
+        if (btn) {
+            btn.innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px; height: 20px;"> Sign in with Google`;
+            btn.disabled = false;
+        }
     }
 };
 
