@@ -1526,14 +1526,16 @@ body.modal-open {
 </head>
 <body>
 
-  <div id="loginScreen">
-    <h2 style="text-align:center; color: var(--primary); margin-top: 0;">Wallet 💳 Login</h2>
-    <form id="loginForm">
-      <div class="form-group" style="margin-bottom: 14px;"><label>Email</label><input type="email" id="loginEmail" required autocomplete="email" inputmode="email"></div>
-      <div class="form-group" style="margin-bottom: 16px;"><label>Password</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
-      <button type="submit" class="btn" id="loginBtn">Sign In</button>
-    </form>
-    <div id="loginError" style="color: var(--danger); text-align: center; margin-top: 10px; font-size: 12px;"></div>
+<div id="loginScreen">
+    <h2 style="text-align:center; color: var(--primary); margin-top: 0; margin-bottom: 24px;">Wallet 💳 Login</h2>
+    
+    <!-- Google Sign-In Only -->
+    <button type="button" id="googleLoginBtn" class="btn" style="background: #ffffff; color: #3c4043; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); padding: 12px; font-size: 14px;">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" style="width: 20px; height: 20px;">
+      Sign in with Google
+    </button>
+
+    <div id="loginError" style="color: var(--danger); text-align: center; margin-top: 14px; font-size: 12px;"></div>
   </div>
 
   <div id="appScreen" class="app-container hidden">
