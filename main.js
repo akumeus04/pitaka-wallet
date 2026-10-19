@@ -78,45 +78,6 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-document.getElementById('loginForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  const errorDiv = document.getElementById('loginError');
-  
-  // Clear any previous errors and show a loading state
-  errorDiv.innerText = "Authenticating...";
-  errorDiv.style.color = "#6b7280"; 
-
-  auth.signInWithEmailAndPassword(email, password)
-    .catch(err => {
-      // Switch text color back to red for errors
-      errorDiv.style.color = "var(--danger)"; 
-      
-      // Convert the entire error to an uppercase string so we can easily scan it
-      const errorString = (err.message || err.toString()).toUpperCase();
-      const errorCode = (err.code || "").toUpperCase();
-
-      // Intercept the raw JSON, as well as standard Firebase error codes
-      if (errorString.includes('INVALID_LOGIN_CREDENTIALS') || 
-          errorCode.includes('WRONG-PASSWORD') || 
-          errorCode.includes('USER-NOT-FOUND') || 
-          errorCode.includes('INVALID-CREDENTIAL')) {
-        
-        errorDiv.innerText = "Wrong email or password. Please try again.";
-        
-      } else if (errorCode.includes('INVALID-EMAIL') || errorString.includes('INVALID_EMAIL')) {
-        
-        errorDiv.innerText = "Please enter a valid email format.";
-        
-      } else {
-        // Fallback: Show a clean error to the user, but log the ugly JSON to the console for you
-        errorDiv.innerText = "Login error. Please try again."; 
-        console.error("Firebase Auth Error:", err);
-      }
-    });
-});
 document.getElementById('logoutBtn').addEventListener('click', () => {
   const confirmLogout = confirm("Are you sure you want to log out of your wallet?");
   if (confirmLogout) {
