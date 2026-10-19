@@ -443,7 +443,15 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+    getAuth, 
+    GoogleAuthProvider, 
+    signInWithPopup, 
+    signInWithRedirect, 
+    getRedirectResult, 
+    onAuthStateChanged, 
+    signOut 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // ── FIREBASE CONFIGURATION ──
 const firebaseConfig = {
@@ -514,15 +522,13 @@ window.handleGoogleLogin = async function() {
     const errDiv = document.getElementById('loginError');
     
     if (btn) {
-        btn.innerHTML = 'Verifying...'; 
+        btn.innerHTML = 'Redirecting...'; 
         btn.disabled = true; 
     }
-    if (errDiv) {
-        errDiv.style.display = 'none';
-    }
+    if (errDiv) errDiv.style.display = 'none';
     
     try { 
-        await signInWithPopup(auth, provider); 
+        await signInWithRedirect(auth, provider); 
     } catch (error) { 
         if (errDiv) {
             errDiv.textContent = 'Authentication failed: ' + error.message; 
