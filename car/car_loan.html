@@ -522,13 +522,15 @@ window.handleGoogleLogin = async function() {
     const errDiv = document.getElementById('loginError');
     
     if (btn) {
-        btn.innerHTML = 'Redirecting...'; 
+        btn.innerHTML = 'Verifying...'; 
         btn.disabled = true; 
     }
-    if (errDiv) errDiv.style.display = 'none';
+    if (errDiv) {
+        errDiv.style.display = 'none';
+    }
     
     try { 
-        await signInWithRedirect(auth, provider); 
+        await signInWithPopup(auth, provider); 
     } catch (error) { 
         if (errDiv) {
             errDiv.textContent = 'Authentication failed: ' + error.message; 
