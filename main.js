@@ -31,44 +31,69 @@ let activeBrowserMonth = currentMonth;
 
 
 // ==========================================
-// AUTHENTICATION & UI SETUP
+// AUTHENTICATION & UI SETUP (SHA-256 RESTRICTED)
 // ==========================================
-auth.onAuthStateChanged(user => {
+
+// 🚨 Paste your 64-character SHA-256 email hash below (in lowercase)
+const ALLOWED_EMAIL_HASH = "24a8875545b9c0867169cc58a471fd522134a0c8ac795110f4111a9fbdae7d14";
+
+// Helper function: Hashes email using native Web Crypto API
+async function hashEmail(email) {
+  if (!email) return "";
+  const msgBuffer = new TextEncoder().encode(email.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+auth.onAuthStateChanged(async (user) => {
   if (user) {
+    const userHash = await hashEmail(user.email || "");
+
+    // 🔒 Security Check: Compare user hash against allowed hash
+    if (userHash !== ALLOWED_EMAIL_HASH) {
+      await auth.signOut();
+      const loginError = document.getElementById('loginError');
+      if (loginError) {
+        loginError.innerText = "Access Denied: Account not authorized.";
+      }
+      return;
+    }
+
+    // ✅ Authorized user confirmed!
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appScreen').classList.remove('hidden');
-    
     document.getElementById('loginError').innerText = ""; 
-    
+
     fetchLiveExchangeRate(); 
-    
+
     // 🎯 TRIGGER BOTH LISTENERS NOW THAT YOU ARE SECURELY LOGGED IN
     startFirebaseListeners();
-    
-    
+
     loadDatabase(); 
     startInactivityTracking(); 
-	
-	// 📅 Wake up the Google Calendar script instantly after login
+
+    // 📅 Wake up the Google Calendar script instantly after login
     if (typeof fetchHolidays === "function") {
         fetchHolidays();
     }
-	
-	// 📌 Securely fetch personal calendar notes
+
+    // 📌 Securely fetch personal calendar notes
     if (typeof startCalendarNotesListener === "function") {
         startCalendarNotesListener();
     }
-	
-	// 💰 Start listening for the global budget limit
+
+    // 💰 Start listening for the global budget limit
     if (typeof startBudgetListener === "function") {
         startBudgetListener();
     }
-	
+
   } else {
+    // 🔒 Signed Out State
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('appScreen').classList.add('hidden');
     stopInactivityTracking(); 
-    
+
     // Safety measure: Detach all listeners when logged out
     db.ref('income').off();
     db.ref('expenses').off();
