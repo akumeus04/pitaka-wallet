@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Loan Tracker</title>
+    <link rel="icon" type="image/ico" href="car-favicon.ico">
+    <link rel="manifest" href="car-manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Car Loan Tracker">
+    <link rel="apple-touch-icon" href="car-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+	
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./car-sw.js', { scope: './' })
+            .then(reg => console.log('Car Tracker Service Worker registered'))
+            .catch(err => console.error('Car Tracker Service Worker failed', err));
+        });
+      }
+    </script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #3730A3;
+            --violet: #7C3AED;
+            --bg-color: #EEF2FF;
+            --card-bg: #ffffff;
+            --text-dark: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --pending: #F59E0B;
+            --processing: #3B82F6;
+            --paid: #10B981;
+            --cancel: #EF4444;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        button, input, select { font-family: inherit; }
+
+        /* ══ LOGIN OVERLAY ══ */
+        .login-overlay {
+            position: fixed; inset: 0;
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
+        }
+        .login-box {
+            background: #fff; padding: 40px 32px; border-radius: 24px;
+            width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-box h2 { font-family: 'Poppins', sans-serif; color: var(--text-dark); margin-bottom: 24px; }
+        .login-error { display: none; background: #fee2e2; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.85rem; }
+        .form-control {
+            width: 100%; padding: 14px; border: 1.5px solid var(--border); border-radius: 12px;
+            font-family: inherit; font-size: 15px; margin-bottom: 16px; transition: border-color 0.2s;
+        }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+        .btn-primary {
+            width: 100%; padding: 16px; background: var(--primary); color: #fff;
+            border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        /* ══ MAIN APP ══ */
+        .app-container {
+            max-width: 600px; margin: 0 auto; padding: 20px 20px 60px; display: none;
+        }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 12px; margin-bottom: 24px; padding-top: 10px;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header h1 { font-family: 'Poppins', sans-serif; font-size: 1.35rem; color: var(--text-dark); }
+        .btn-icon {
+            background: #fff; border: 1px solid var(--border); width: 42px; height: 42px;
+            border-radius: 10px; cursor: pointer; color: var(--text-dark); font-size: 1.05rem;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .btn-icon:hover { background: var(--bg-color); }
+        .btn-logout { background: #fff; border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--text-muted); font-weight: 600; font-size: 0.85rem; }
+
+        .card {
+            background: var(--card-bg); padding: 20px; border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 20px;
+        }
+
+        /* Inputs */
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Summary Grid */
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .summary-box { background: var(--bg-color); padding: 16px; border-radius: 12px; text-align: center; border: 1px solid var(--border); }
+        .summary-box h3 { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+        .summary-box p { font-family: 'Poppins', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+        .summary-box.hero { background: linear-gradient(135deg, var(--primary), var(--violet)); border-color: transparent; box-shadow: 0 8px 20px rgba(79,70,229,0.25); }
+        .summary-box.hero h3 { color: rgba(255,255,255,0.75); }
+        .summary-box.hero p { color: #fff; }
+
+        /* Year Navigation */
+        .year-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-color); padding: 10px 16px; border-radius: 12px;
+            margin-bottom: 16px; border: 1px solid var(--border);
+        }
+        .year-nav h3 { margin: 0; font-family: 'Poppins', sans-serif; color: var(--text-dark); font-size: 1.2rem; }
+        .btn-nav {
+            background: var(--primary); color: #fff; border: none; padding: 8px 16px;
+            border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-nav:hover { background: var(--primary-dark); }
+        .btn-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* List Tabs (Schedule / Archive) */
+        .list-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .list-tab {
+            flex: 1; padding: 10px 8px; border-radius: 10px; border: 1.5px solid var(--border);
+            background: #fff; font-weight: 600; font-size: 0.83rem; cursor: pointer;
+            color: var(--text-muted); text-align: center; transition: 0.15s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .list-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .list-tab .count { font-size: 0.68rem; font-weight: 700; background: var(--bg-color); color: var(--primary); padding: 1px 7px; border-radius: 10px; }
+        .list-tab.active .count { background: rgba(255,255,255,0.25); color: #fff; }
+
+        /* Months List */
+        .month-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .month-item:last-child { border-bottom: none; }
+        .month-name { font-weight: 600; color: var(--text-dark); }
+
+        select.status-dropdown {
+            padding: 8px 14px; border-radius: 20px; border: 1.5px solid transparent;
+            font-weight: 600; font-size: 0.85rem; cursor: pointer; outline: none;
+            appearance: none; text-align: center; width: 130px; font-family: inherit;
+        }
+
+        .status-pending { background-color: #FEF3C7; color: #D97706; border-color: #FCD34D !important; }
+        .status-processing { background-color: #DBEAFE; color: #1D4ED8; border-color: #BFDBFE !important; }
+        .status-paid { background-color: #D1FAE5; color: #047857; border-color: #A7F3D0 !important; }
+        .status-cancel { background-color: #FEE2E2; color: #B91C1C; border-color: #FECACA !important; }
+
+        .empty-msg { text-align: center; color: var(--text-muted); font-size: 14px; padding: 24px 8px; }
+
+        /* Cloud Status */
+        /* Cloud indicator: animated live dot (green = synced, amber = connecting, red = offline) */
+        .cloud-status { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 8px; }
+        .live-dot {
+            width: 11px; height: 11px; border-radius: 50%; background: #10B981;
+            animation: livePulse 1.8s ease-out infinite;
+        }
+        .live-dot.connecting { background: #F59E0B; animation: liveBlink 1s ease-in-out infinite; }
+        .live-dot.offline { background: #EF4444; animation: none; box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
+        @keyframes livePulse {
+            0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.55); }
+            70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+            100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+        }
+        @keyframes liveBlink { 50% { opacity: 0.3; } }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: #1E293B; color: #fff; padding: 12px 24px; border-radius: 50px;
+            font-weight: 500; font-size: 0.9rem; transition: transform 0.4s; z-index: 2000;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* ══ SETTINGS DRAWER (Burger Menu) ══ */
+        .drawer-overlay {
+            position: fixed; inset: 0; background: rgba(15,23,42,0.45); backdrop-filter: blur(2px);
+            z-index: 998; display: none; opacity: 0; transition: opacity 0.25s;
+        }
+        .drawer-overlay.open { display: block; opacity: 1; }
+        .drawer {
+            position: fixed; top: 0; left: 0; height: 100vh; width: 320px; max-width: 86vw;
+            background: #fff; z-index: 999; transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+            box-shadow: 12px 0 32px rgba(0,0,0,0.18); overflow-y: auto; padding: 22px 20px 32px;
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .drawer-header h2 { font-family: 'Poppins', sans-serif; font-size: 1.1rem; color: var(--text-dark); }
+        .btn-close-drawer {
+            width: 32px; height: 32px; border-radius: 8px; background: var(--bg-color); border: none;
+            cursor: pointer; font-size: 1rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+        }
+        .drawer-section-title {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+            color: var(--text-muted); margin: 22px 0 12px;
+        }
+        .drawer-section-title:first-of-type { margin-top: 4px; }
+
+        .btn-save-setup {
+            width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none;
+            border-radius: 12px; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+            font-family: 'Poppins', sans-serif; transition: background 0.2s;
+        }
+        .btn-save-setup:hover { background: var(--primary-dark); }
+        .btn-save-setup:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .toggle-row {
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            padding: 10px 0; border-top: 1px solid var(--border);
+        }
+        .toggle-row-label { font-size: 0.88rem; font-weight: 600; color: var(--text-dark); }
+        .toggle-row-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+        .switch { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; inset: 0; background: #CBD5E1; border-radius: 26px; cursor: pointer; transition: 0.2s; }
+        .slider::before { content: ''; position: absolute; height: 19px; width: 19px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+        .switch input:checked + .slider { background: var(--primary); }
+        .switch input:checked + .slider::before { transform: translateX(19px); }
+
+        .btn-test-notify:hover { background: #E0E7FF; }
+        .notify-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+
+        /* ══ MONTH ROWS (tap month to update payment) ══ */
+        .list-hint { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+        .status-badge {
+            display: inline-block; padding: 8px 14px; border-radius: 20px; border: 1.5px solid transparent;
+            font-weight: 600; font-size: 0.85rem; min-width: 110px; text-align: center;
+        }
+        .month-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+        @media (min-width: 520px) { .month-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 860px) { .month-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; } }
+        .month-box {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            min-height: 96px; padding: 18px 10px; border-radius: 16px; border: 1.5px solid var(--border);
+            background: #fff; cursor: pointer; font-family: inherit; color: var(--text-dark);
+            transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+        }
+        .month-box:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(79,70,229,0.15); border-color: var(--primary); }
+        .month-box:active { transform: scale(0.98); }
+        .month-box:focus-visible { outline: 3px solid rgba(79,70,229,0.35); outline-offset: 2px; }
+        .month-box.box-pending    { background: #FFFBEB; border-color: #FDE68A; }
+        .month-box.box-processing { background: #EFF6FF; border-color: #BFDBFE; }
+        .month-box.box-paid       { background: #ECFDF5; border-color: #A7F3D0; }
+        .month-box.box-cancel     { background: #FEF2F2; border-color: #FECACA; }
+        .mb-name { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1.05rem; }
+        .month-box .status-badge { min-width: 0; padding: 4px 12px; font-size: 0.75rem; }
+        .month-box.flash { animation: boxFlash 1.8s ease; }
+        @keyframes boxFlash { 0%, 60% { box-shadow: 0 0 0 5px rgba(245,158,11,0.55); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+
+        /* ══ MODALS (payment picker + reminder) ══ */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center;
+            padding: 20px; background: rgba(15,23,42,0.5); backdrop-filter: blur(3px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-card {
+            position: relative; background: #fff; width: 100%; max-width: 400px; border-radius: 20px;
+            padding: 26px 24px 22px; box-shadow: 0 24px 48px rgba(0,0,0,0.25);
+            animation: modalIn 0.2s ease;
+        }
+        @keyframes modalIn { from { transform: translateY(10px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+        .modal-icon { font-size: 2rem; margin-bottom: 6px; }
+        .modal-title { font-family: 'Poppins', sans-serif; font-size: 1.15rem; margin-bottom: 6px; }
+        .modal-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; }
+        .modal-text { color: var(--text-dark); font-size: 0.95rem; line-height: 1.55; margin-bottom: 14px; }
+        .modal-note { font-size: 0.8rem; color: var(--text-muted); background: var(--bg-color); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+        .modal-x {
+            position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 8px; border: none;
+            background: var(--bg-color); color: var(--text-muted); cursor: pointer; font-size: 0.9rem;
+        }
+        .pay-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .pay-option {
+            display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;
+            background: #fff; border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .pay-option:hover { border-color: var(--primary); background: var(--bg-color); }
+        .pay-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; border-width: 2px; border-style: solid; }
+        .pay-text { flex: 1; display: flex; flex-direction: column; }
+        .pay-text b { font-size: 0.95rem; }
+        .pay-text small { color: var(--text-muted); font-size: 0.75rem; }
+        .pay-tag { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; background: var(--bg-color); color: var(--text-muted); }
+        .pay-tag.suggested { background: #D1FAE5; color: #047857; }
+        .modal-actions { display: flex; gap: 10px; }
+        .btn-secondary, .btn-confirm {
+            flex: 1; padding: 13px; border-radius: 12px; font-weight: 600; font-size: 0.92rem; cursor: pointer; border: 1.5px solid var(--border);
+        }
+        .btn-secondary { background: #fff; color: var(--text-dark); }
+        .btn-secondary:hover { background: var(--bg-color); }
+        .btn-confirm { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .btn-confirm:hover { background: var(--primary-dark); }
+        .btn-confirm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ══ DESKTOP RESPONSIVE ══ */
+        @media (min-width: 860px) {
+            .app-container { max-width: 860px; padding: 32px 32px 60px; }
+            .header h1 { font-size: 1.6rem; }
+            .summary-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+            .card { padding: 26px; }
+            .month-item { padding: 16px 4px; }
+            .drawer { width: 360px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+        <h2>Sign In</h2>
+        
+        <!-- Must have id="loginError" -->
+        <div id="loginError" class="login-error"></div>
+
+        <!-- Must have id="googleLoginBtn" -->
+        <button type="button" id="googleLoginBtn" class="btn-primary" onclick="window.handleGoogleLogin()" style="background: #ffffff; color: #3c4043; border: 1px solid #dadce0; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" style="width: 20px; height: 20px;">
+            Sign in with Google
+        </button>
+    </div>
+</div>
+
+    <!-- ══ SETTINGS DRAWER (burger menu) ══ -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="window.closeDrawer()"></div>
+    <div class="drawer" id="settingsDrawer">
+        <div class="drawer-header">
+            <h2>⚙️ Loan Setup</h2>
+            <button class="btn-close-drawer" onclick="window.closeDrawer()" aria-label="Close Loan Setup">✕</button>
+        </div>
+
+        <div class="input-group">
+            <label>Monthly Amortization (₱)</label>
+            <input type="number" id="monthlyAmount" class="form-control" placeholder="e.g. 20000" oninput="window.rebuildScheduleDebounced()">
+        </div>
+        <div class="input-group">
+            <label>Total Months</label>
+            <input type="number" id="totalMonths" class="form-control" placeholder="e.g. 60" oninput="window.rebuildScheduleDebounced()">
+        </div>
+        <div class="input-group" style="margin-bottom: 4px;">
+            <label>Start Month</label>
+            <input type="month" id="startMonth" class="form-control" style="margin-bottom: 0;" onchange="window.rebuildSchedule()">
+        </div>
+
+        <button class="btn-save-setup" id="saveBtn" onclick="window.saveData()">💾 Save Setup</button>
+
+        <div class="drawer-section-title">🔔 Payment Reminder</div>
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-row-label">Notify on the 25th</div>
+                <div class="toggle-row-sub">Push alert comes from Apps Script; this also turns the in-page 25th prompts on/off</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="notifyToggle" checked onchange="window.toggleNotify(this)">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="app-container" id="mainApp">
+        <div class="header">
+            <div class="header-left">
+                <button class="btn-icon" id="burgerBtn" onclick="window.openDrawer()" title="Loan Setup" aria-label="Open Loan Setup">☰</button>
+                <h1>🚘 Car Loan <div id="cloudStatus" class="cloud-status" role="status" aria-live="polite" title="Connecting to Firebase…"><span class="live-dot connecting" id="liveDot" aria-hidden="true"></span><span class="sr-only" id="cloudText">Connecting to Firebase…</span></div></h1>
+            </div>
+            <button class="btn-logout" onclick="window.logout()">Logout</button>
+        </div>
+
+
+        <div class="card summary-grid">
+            <div class="summary-box hero">
+                <h3>Total Loan Amount</h3>
+                <p id="displayTotalAmount">₱ 0.00</p>
+            </div>
+            <div class="summary-box hero">
+                <h3>Monthly Payment</h3>
+                <p id="displayMonthlyAmount">₱ 0.00</p>
+            </div>
+            <div class="summary-box">
+                <h3>Remaining Balance</h3>
+                <p id="remainingAmount">₱ 0.00</p>
+            </div>
+            <div class="summary-box">
+                <h3>Remaining Months</h3>
+                <p id="remainingMonths">0</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="year-nav">
+                <button class="btn-nav" id="btnPrevYear" onclick="window.changeYear(-1)" aria-label="Previous year">&#8592;</button>
+                <h3 id="currentYearLabel">Select Start Date</h3>
+                <button class="btn-nav" id="btnNextYear" onclick="window.changeYear(1)" aria-label="Next year">&#8594;</button>
+            </div>
+
+            <div class="list-tabs">
+                <button class="list-tab active" id="tabSchedule" onclick="window.switchListTab('schedule')">
+                    📅 Schedule <span class="count" id="scheduleCount">0</span>
+                </button>
+                <button class="list-tab" id="tabArchive" onclick="window.switchListTab('archive')">
+                    📦 Archive (Paid) <span class="count" id="archiveCount">0</span>
+                </button>
+            </div>
+
+            <div id="monthsContainer">
+                <p class="empty-msg">Open ⚙️ Loan Setup to enter your Total Months and Start Month.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment picker (month tap) -->
+    <div class="modal-overlay" id="payModal" role="dialog" aria-modal="true">
+        <div class="modal-card" id="payModalBody"></div>
+    </div>
+
+    <!-- 25th reminder / next-day follow-up -->
+    <div class="modal-overlay" id="reminderModal" role="dialog" aria-modal="true" aria-labelledby="rmTitle">
+        <div class="modal-card">
+            <button class="modal-x" id="rmClose" aria-label="Close">✕</button>
+            <div class="modal-icon" id="rmIcon">💳</div>
+            <h3 class="modal-title" id="rmTitle"></h3>
+            <p class="modal-text" id="rmText"></p>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="rmNo" type="button"></button>
+                <button class="btn-confirm" id="rmYes" type="button"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">✅ Data Saved!</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { 
+    getAuth, 
+    GoogleAuthProvider, 
+    signInWithPopup, 
+    signInWithRedirect, 
+    getRedirectResult, 
+    onAuthStateChanged, 
+    signOut 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// ── FIREBASE CONFIGURATION ──
+const firebaseConfig = {
+    apiKey: "AIzaSyAc46X6MIXI-moZ2oTy2ShiDv6IrjhVQC4",
+    authDomain: "finance-app-23309.firebaseapp.com",
+    databaseURL: "https://finance-app-23309-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "finance-app-23309",
+    storageBucket: "finance-app-23309.firebasestorage.app",
+    messagingSenderId: "268979076437",
+    appId: "1:268979076437:web:204abafc00e7558f4e83dc"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+let unsubscribeDb = null;
+
+
+
+// ── DRAWER (burger menu) ──
+window.openDrawer = function() {
+    document.getElementById('settingsDrawer').classList.add('open');
+    document.getElementById('drawerOverlay').classList.add('open');
+};
+window.closeDrawer = function() {
+    document.getElementById('settingsDrawer').classList.remove('open');
+    document.getElementById('drawerOverlay').classList.remove('open');
+};
+
+// Saves the on/off preference only — the actual reminder is sent by Apps Script,
+// which reads this flag (and notifiedMonths) directly from Firebase.
+window.toggleNotify = async function(el) {
+    window.loanData.notifyEnabled = el.checked;
+    try {
+        await update(ref(db, 'car_loan/tracker'), { notifyEnabled: el.checked });
+        showToast(el.checked ? '🔔 Reminders enabled' : '🔕 Reminders disabled');
+    } catch (e) { console.error(e); }
+};
+
+// ── APP STATE ──
+window.loanData = {
+    payments: {},        // Stores status keyed by "YYYY-MM" (e.g., {"2026-06": "Paid"})
+    notifyEnabled: true,
+    notifiedMonths: {},  // Dedupe flag per "YYYY-MM" so we don't spam the 25th
+    reminders: {}        // In-page reminder answers per "YYYY-MM": { date: "YYYY-MM-DD", answer: "yes"|"no" }
+};
+window.schedule = [];    // Full array of generated months
+window.currentViewYear = new Date().getFullYear();
+window.currentListTab = 'schedule'; // 'schedule' | 'archive'
+
+// ==========================================
+// AUTHENTICATION & UI SETUP (SHA-256 RESTRICTED)
+// ==========================================
+
+// 🚨 Paste your 64-character SHA-256 email hash below (in lowercase)
+const ALLOWED_EMAIL_HASH = "YOUR_64_CHARACTER_SHA256_HASH_HERE";
+
+// Helper function: Hashes email using native Web Crypto API
+async function hashEmail(email) {
+    if (!email) return "";
+    const msgBuffer = new TextEncoder().encode(email.toLowerCase().trim());
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const userHash = await hashEmail(user.email || "");
+
+        // 🔒 Security Check: Compare user hash against allowed hash
+        if (userHash !== ALLOWED_EMAIL_HASH) {
+            await signOut(auth);
+            const errDiv = document.getElementById('loginError');
+            if (errDiv) {
+                errDiv.textContent = "Access Denied: Account not authorized.";
+                errDiv.style.display = 'block';
+            }
+            return;
+        }
+
+        // ✅ Authorized user confirmed!
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        document.getElementById('loginError').style.display = 'none';
+
+        // Start Firebase listeners for the Car Loan app
+        startDatabaseSync();
+
+    } else {
+        // 🔒 Signed Out State
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+        
+        // Safety measure: Detach database listeners when logged out
+        if (unsubscribeDb) {
+            unsubscribeDb();
+        }
+    }
+});
+
+window.handleGoogleLogin = async function() {
+    const provider = new GoogleAuthProvider();
+    const btn = document.getElementById('googleLoginBtn');
+    const errDiv = document.getElementById('loginError');
+    
+    if (btn) {
+        btn.innerHTML = 'Verifying...'; 
+        btn.disabled = true; 
+    }
+    if (errDiv) {
+        errDiv.style.display = 'none';
+    }
+    
+    try { 
+        await signInWithPopup(auth, provider); 
+    } catch (error) { 
+        if (errDiv) {
+            errDiv.textContent = 'Authentication failed: ' + error.message; 
+            errDiv.style.display = 'block'; 
+        }
+        if (btn) {
+            btn.innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 20px; height: 20px;"> Sign in with Google`;
+            btn.disabled = false;
+        }
+    }
+};
+
+window.logout = async function() { await signOut(auth); };
+
+// ── DEBOUNCE HELPER (avoid rebuilding the schedule on every keystroke) ──
+function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
+// ── LOGIC: BUILD SCHEDULE ──
+window.rebuildSchedule = function() {
+    window.schedule = [];
+    const totalMonths = parseInt(document.getElementById('totalMonths').value) || 0;
+    const startMonthVal = document.getElementById('startMonth').value; // format: "YYYY-MM"
+
+    if (!startMonthVal || totalMonths <= 0) {
+        window.renderMonthsUI();
+        window.calculateLoan();
+        return;
+    }
+
+    let [year, month] = startMonthVal.split('-').map(Number);
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    for (let i = 0; i < totalMonths; i++) {
+        let currentMonthNum = month + i;
+        let currentYear = year + Math.floor((currentMonthNum - 1) / 12);
+        let displayMonthIndex = ((currentMonthNum - 1) % 12);
+
+        let monthStr = (displayMonthIndex + 1).toString().padStart(2, '0');
+        let dateKey = `${currentYear}-${monthStr}`;
+
+        window.schedule.push({
+            key: dateKey,
+            year: currentYear,
+            label: `${monthNames[displayMonthIndex]} ${currentYear}`,
+            monthName: monthNames[displayMonthIndex]
+        });
+    }
+
+    if (!window.schedule.some(m => m.year === window.currentViewYear)) {
+        window.currentViewYear = window.schedule[0].year;
+    }
+
+    window.renderMonthsUI();
+    window.calculateLoan();
+};
+window.rebuildScheduleDebounced = debounce(window.rebuildSchedule, 350);
+
+// ── UI: SCHEDULE / ARCHIVE TABS ──
+window.switchListTab = function(tab) {
+    window.currentListTab = tab;
+    document.getElementById('tabSchedule').classList.toggle('active', tab === 'schedule');
+    document.getElementById('tabArchive').classList.toggle('active', tab === 'archive');
+    window.renderMonthsUI();
+};
+
+// ── UI: RENDER MONTHS AND NAV ──
+window.renderMonthsUI = function() {
+    const container = document.getElementById('monthsContainer');
+    container.innerHTML = '';
+
+    // Update tab counts across the whole schedule (not just current year)
+    const archiveTotal = window.schedule.filter(m => {
+        const s = window.loanData.payments[m.key] || 'Pending';
+        return s === 'Paid' || s === 'Cancel'; // Both Paid and Cancel count toward Archive
+    }).length;
+    const activeTotal = window.schedule.length - archiveTotal;
+    
+    document.getElementById('scheduleCount').textContent = activeTotal;
+    document.getElementById('archiveCount').textContent  = archiveTotal;
+
+    if (window.schedule.length === 0) {
+        document.getElementById('currentYearLabel').innerText = "Select Start Date";
+        document.getElementById('btnPrevYear').disabled = true;
+        document.getElementById('btnNextYear').disabled = true;
+        container.innerHTML = '<p class="empty-msg">Open ⚙️ Loan Setup to enter your Total Months and Start Month.</p>';
+        return;
+    }
+
+    document.getElementById('currentYearLabel').innerText = window.currentViewYear;
+
+    document.getElementById('btnPrevYear').disabled = !window.schedule.some(m => m.year === window.currentViewYear - 1);
+    document.getElementById('btnNextYear').disabled = !window.schedule.some(m => m.year === window.currentViewYear + 1);
+
+    const monthsInYear = window.schedule.filter(m => m.year === window.currentViewYear);
+    const isArchiveTab = window.currentListTab === 'archive';
+    
+    // Filter visible months based on the tab
+    const visibleMonths = monthsInYear.filter(m => {
+        const status = window.loanData.payments[m.key] || 'Pending';
+        const isArchivedStatus = status === 'Paid' || status === 'Cancel';
+        return isArchiveTab ? isArchivedStatus : !isArchivedStatus;
+    });
+
+    if (visibleMonths.length === 0) {
+        container.innerHTML = isArchiveTab
+            ? '<p class="empty-msg">No completed months yet for this year. Mark a month "Paid" or "Cancel" to move it here.</p>'
+            : '<p class="empty-msg">Nothing pending this year — check the Archive tab for completed months.</p>';
+        return;
+    }
+
+    // Month boxes: tap a box to open the payment picker (same for Schedule and Archive tabs)
+    const rowsHtml = '<p class="list-hint">Tap a month to update its payment.</p><div class="month-grid">' +
+        visibleMonths.map(m => {
+            const status = window.loanData.payments[m.key] || 'Pending';
+            return `<button type="button" class="month-box box-${status.toLowerCase()}" data-key="${m.key}"
+                        onclick="window.openPayModal('${m.key}')" aria-label="${m.label}, ${status}. Tap to update payment.">
+                        <span class="mb-name">${m.monthName}</span>
+                        <span class="status-badge status-${status.toLowerCase()}">${status}</span>
+                    </button>`;
+        }).join('') + '</div>';
+
+    container.innerHTML = rowsHtml;
+};
+
+window.changeYear = function(direction) {
+    let newYear = window.currentViewYear + direction;
+    if (window.schedule.some(m => m.year === newYear)) {
+        window.currentViewYear = newYear;
+        window.renderMonthsUI();
+    }
+};
+
+// ── INSTANT FIREBASE AUTO-SAVE ──
+window.updateStatus = async function(key, value) {
+    window.loanData.payments[key] = value;
+    window.calculateLoan();
+    window.renderMonthsUI();
+
+    try {
+        await update(ref(db, 'car_loan/tracker/payments'), { [key]: value });
+        const isArchived = value === 'Paid' || value === 'Cancel';
+        showToast(isArchived ? `✅ Marked ${value} — moved to Archive` : '✅ Status Updated!');
+    } catch (e) {
+        console.error("Error auto-saving status to Firebase:", e);
+        showToast('❌ Could not save — check your connection');
+    }
+};
+
+// ── CALCULATIONS ──
+window.calculateLoan = function() {
+    const monthlyAmount = parseFloat(document.getElementById('monthlyAmount').value) || 0;
+    const totalMonths = window.schedule.length;
+
+    const totalAmount = monthlyAmount * totalMonths;
+
+    let paidCount = 0;
+    window.schedule.forEach(m => {
+        if (window.loanData.payments[m.key] === 'Paid') {
+            paidCount++;
+        }
+    });
+
+    let remainingAmount = totalAmount - (paidCount * monthlyAmount);
+    if (remainingAmount < 0) remainingAmount = 0;
+
+    let remainingMonths = totalMonths - paidCount;
+    if (remainingMonths < 0) remainingMonths = 0;
+
+    document.getElementById('displayTotalAmount').innerText = "₱ " + totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('displayMonthlyAmount').innerText = "₱ " + monthlyAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('remainingAmount').innerText = "₱ " + remainingAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('remainingMonths').innerText = remainingMonths;
+};
+
+// ── DATABASE SYNC ──
+function startDatabaseSync() {
+    const loanRef = ref(db, 'car_loan/tracker');
+
+    // Connection watcher drives the animated indicator (once per page)
+    if (!window._connWatch) {
+        window._connWatch = true;
+        onValue(ref(db, '.info/connected'), (snap) => {
+            if (snap.val() === true) setCloudState(hasSynced ? 'synced' : 'connecting');
+            else if (hasSynced) setCloudState('offline');
+        });
+    }
+
+    unsubscribeDb = onValue(loanRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            document.getElementById('monthlyAmount').value = data.monthlyAmount || '';
+            document.getElementById('totalMonths').value = data.totalMonths || '';
+            document.getElementById('startMonth').value = data.startMonth || '';
+
+            // Load saved payment statuses & notification state
+            window.loanData.payments = data.payments || {};
+            window.loanData.notifyEnabled = data.notifyEnabled !== undefined ? data.notifyEnabled : true;
+            window.loanData.notifiedMonths = data.notifiedMonths || {};
+            window.loanData.reminders = data.reminders || {};
+            window.loanData.lastFollowUp = data.lastFollowUp || '';
+            document.getElementById('notifyToggle').checked = window.loanData.notifyEnabled;
+
+            window.rebuildSchedule();
+        }
+        hasSynced = true;
+        setCloudState('synced');
+        window.checkReminders();
+    });
+}
+
+
+window.saveData = async function() {
+    const btn = document.getElementById('saveBtn');
+    btn.innerHTML = '⏳ Saving...'; btn.disabled = true;
+
+    const data = {
+        monthlyAmount: parseFloat(document.getElementById('monthlyAmount').value) || 0,
+        totalMonths: parseInt(document.getElementById('totalMonths').value) || 0,
+        startMonth: document.getElementById('startMonth').value || '',
+        payments: window.loanData.payments,
+        notifyEnabled: window.loanData.notifyEnabled,
+        notifiedMonths: window.loanData.notifiedMonths,
+        reminders: window.loanData.reminders,
+        lastFollowUp: window.loanData.lastFollowUp || ''
+    };
+
+    try {
+        await set(ref(db, 'car_loan/tracker'), data);
+        showToast("✅ Setup Saved!");
+        window.closeDrawer();
+    } catch (e) {
+        console.error(e);
+        showToast("❌ Error saving data");
+    } finally {
+        btn.innerHTML = '💾 Save Setup'; btn.disabled = false;
+    }
+};
+
+// ── CLOUD INDICATOR ──
+let hasSynced = false;
+function setCloudState(state) {
+    const text = {
+        connecting: 'Connecting to Firebase…',
+        synced: 'Synced with Firebase',
+        offline: 'Offline — changes will sync when you reconnect'
+    }[state];
+    document.getElementById('liveDot').className = 'live-dot ' + state;
+    document.getElementById('cloudText').textContent = text;
+    document.getElementById('cloudStatus').title = text;
+}
+
+// ── PAYMENT PICKER (tap a month → choose status → confirm) ──
+const PAY_STATUSES = ['Pending', 'Processing', 'Paid', 'Cancel'];
+const PAY_HINTS = { Pending: 'Not paid yet', Processing: 'Payment in progress', Paid: 'Payment completed', Cancel: 'Skip this month' };
+let payKey = null;
+
+const peso = n => '₱ ' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const monthOf = key => window.schedule.find(m => m.key === key);
+const statusOf = key => window.loanData.payments[key] || 'Pending';
+const monthlyAmt = () => parseFloat(document.getElementById('monthlyAmount').value) || 0;
+
+window.openPayModal = function(key, suggested) {
+    if (!monthOf(key)) return;
+    payKey = key;
+    renderPaySelect(suggested);
+    document.getElementById('payModal').classList.add('open');
+};
+window.closePayModal = function() {
+    document.getElementById('payModal').classList.remove('open');
+    payKey = null;
+};
+
+function renderPaySelect(suggested) {
+    const m = monthOf(payKey), cur = statusOf(payKey);
+    document.getElementById('payModalBody').innerHTML = `
+        <button type="button" class="modal-x" data-act="close" aria-label="Close">✕</button>
+        <h3 class="modal-title">Update payment</h3>
+        <p class="modal-sub"><strong>${m.label}</strong> · ${peso(monthlyAmt())}</p>
+        <div class="pay-options">
+            ${PAY_STATUSES.map(s => `
+                <button type="button" class="pay-option" data-status="${s}">
+                    <span class="pay-dot status-${s.toLowerCase()}"></span>
+                    <span class="pay-text"><b>${s}</b><small>${PAY_HINTS[s]}</small></span>
+                    ${s === cur ? '<span class="pay-tag">Current</span>' : (s === suggested ? '<span class="pay-tag suggested">Suggested</span>' : '')}
+                </button>`).join('')}
+        </div>
+        <div class="modal-actions"><button type="button" class="btn-secondary" data-act="close">Close</button></div>`;
+}
+
+function renderPayConfirm(newStatus) {
+    const m = monthOf(payKey), cur = statusOf(payKey);
+    let note = '';
+    if (newStatus === 'Paid' && cur !== 'Paid') note = `This lowers your remaining balance by ${peso(monthlyAmt())}.`;
+    else if (cur === 'Paid' && newStatus !== 'Paid') note = `This adds ${peso(monthlyAmt())} back to your remaining balance.`;
+    document.getElementById('payModalBody').innerHTML = `
+        <h3 class="modal-title">Confirm update</h3>
+        <p class="modal-text">Change <b>${m.label}</b> from
+            <span class="status-badge status-${cur.toLowerCase()}" style="min-width:0;padding:4px 10px">${cur}</span> to
+            <span class="status-badge status-${newStatus.toLowerCase()}" style="min-width:0;padding:4px 10px">${newStatus}</span>?</p>
+        ${note ? `<div class="modal-note">${note}</div>` : ''}
+        <div class="modal-actions">
+            <button type="button" class="btn-secondary" data-act="back">Back</button>
+            <button type="button" class="btn-confirm" data-act="confirm" data-status="${newStatus}">Confirm</button>
+        </div>`;
+}
+
+document.getElementById('payModalBody').addEventListener('click', async (e) => {
+    const opt = e.target.closest('.pay-option');
+    const act = e.target.closest('[data-act]');
+    if (opt) {
+        const s = opt.dataset.status;
+        if (s === statusOf(payKey)) return showToast(`Already marked ${s}`);
+        renderPayConfirm(s);
+    } else if (act) {
+        const a = act.dataset.act;
+        if (a === 'close') window.closePayModal();
+        else if (a === 'back') renderPaySelect();
+        else if (a === 'confirm') {
+            act.disabled = true; act.textContent = 'Saving…';
+            const key = payKey;
+            window.closePayModal();
+            await window.updateStatus(key, act.dataset.status);
+        }
+    }
+});
+document.getElementById('payModal').addEventListener('click', (e) => { if (e.target.id === 'payModal') window.closePayModal(); });
+
+// ── REMINDERS: ask on the 25th, follow up on later days until paid ──
+const pad2 = n => String(n).padStart(2, '0');
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const REMINDER_DAY_KEY = 'carLoanReminderDay'; // last day the person answered a reminder (this device)
+const isOpenStatus = s => s !== 'Paid' && s !== 'Cancel';
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+async function notifyUser(title, body) {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try {
+        const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+        if (reg && reg.showNotification) return reg.showNotification(title, { body, icon: 'car-192.png', badge: 'car-192.png', tag: 'car-loan-followup' });
+        new Notification(title, { body, icon: 'car-192.png' });
+    } catch (e) { try { new Notification(title, { body }); } catch (_) {} }
+}
+function askNotifyPermission() {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        try { Notification.requestPermission(); } catch (e) {}
+    }
+}
+
+function showReminder({ icon, title, text, yesLabel, noLabel, onYes, onNo }) {
+    const modal = document.getElementById('reminderModal');
+    document.getElementById('rmIcon').textContent = icon;
+    document.getElementById('rmTitle').textContent = title;
+    document.getElementById('rmText').innerHTML = text;
+    document.getElementById('rmYes').textContent = yesLabel;
+    document.getElementById('rmNo').textContent = noLabel;
+    const close = () => modal.classList.remove('open');
+    document.getElementById('rmYes').onclick = () => { close(); onYes(); };
+    document.getElementById('rmNo').onclick = () => { close(); onNo(); };
+    document.getElementById('rmClose').onclick = close;   // closing without answering = ask again next visit
+    modal.classList.add('open');
+}
+
+function saveReminderAnswer(key, answer) {
+    const today = todayStr();
+    lsSet(REMINDER_DAY_KEY, today);
+    // keep the ORIGINAL date so follow-ups keep firing on later days until the month is paid
+    const existing = window.loanData.reminders[key];
+    const entry = existing && existing.date ? existing : { date: today, answer };
+    window.loanData.reminders[key] = entry;
+    update(ref(db, 'car_loan/tracker/reminders'), { [key]: entry }).catch(e => console.error(e));
+}
+
+// Jump to the month in the Schedule tab, then open the payment picker with "Paid" suggested
+window.goToPayment = function(key, suggested) {
+    const m = monthOf(key);
+    if (!m) return;
+    window.currentViewYear = m.year;
+    window.switchListTab('schedule');
+    requestAnimationFrame(() => {
+        const row = document.querySelector(`.month-box[data-key="${key}"]`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('flash');
+        }
+        setTimeout(() => window.openPayModal(key, suggested), 450);
+    });
+};
+
+window.checkReminders = function() {
+    if (window._reminderChecked || window.schedule.length === 0) return;
+    window._reminderChecked = true;                       // once per page load
+    if (!window.loanData.notifyEnabled) return;
+
+    const now = new Date(), today = todayStr();
+    if (lsGet(REMINDER_DAY_KEY) === today) return;        // already answered today on this device
+
+    const curKey = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+    const reminders = window.loanData.reminders;
+
+    // 1) Past-due months still not marked Paid/Cancel: every earlier month, plus this month once the 25th has passed
+    const overdue = window.schedule.filter(m =>
+        isOpenStatus(statusOf(m.key)) && (m.key < curKey || (m.key === curKey && now.getDate() > 25)));
+    if (overdue.length) {
+        const oldest = overdue[0];
+        const names = overdue.slice(0, 3).map(m => `<b>${m.label}</b>`).join(', ') + (overdue.length > 3 ? ` +${overdue.length - 3} more` : '');
+        const plain = overdue.slice(0, 3).map(m => m.label).join(', ') + (overdue.length > 3 ? ` +${overdue.length - 3} more` : '');
+        notifyUser('Car Loan — payment follow-up', `Not marked as paid: ${plain}.`);
+        showReminder({
+            icon: '🔔', title: 'Payment follow-up',
+            text: overdue.length === 1
+                ? `The payment for ${names} is still not marked as paid. Have you paid it now?`
+                : `These months are still not marked as paid: ${names}. Have you paid <b>${oldest.label}</b> now?`,
+            yesLabel: 'Yes, it\'s paid', noLabel: 'Not yet',
+            onYes: () => { lsSet(REMINDER_DAY_KEY, today); askNotifyPermission(); window.goToPayment(oldest.key, 'Paid'); },
+            onNo:  () => { lsSet(REMINDER_DAY_KEY, today); askNotifyPermission(); showToast("OK — I'll remind you again tomorrow"); }
+        });
+        return;
+    }
+
+    // 2) The 25th: ask whether this month's payment has been made
+    const curMonth = monthOf(curKey);
+    if (now.getDate() === 25 && curMonth && isOpenStatus(statusOf(curKey))) {
+        if (reminders[curKey] && reminders[curKey].date === today) return;   // already answered today elsewhere
+        showReminder({
+            icon: '💳', title: 'Payment day',
+            text: `It's the 25th. Has the payment for <b>${curMonth.label}</b> been made?`,
+            yesLabel: 'Yes, it\'s paid', noLabel: 'Not yet',
+            onYes: () => { saveReminderAnswer(curKey, 'yes'); window.goToPayment(curKey, 'Paid'); },
+            onNo:  () => { saveReminderAnswer(curKey, 'no'); askNotifyPermission(); showToast("OK — I'll follow up tomorrow"); }
+        });
+    }
+};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    window.closePayModal();
+    document.getElementById('reminderModal').classList.remove('open');
+});
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (msg) t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+</script>
+</body>
+</html>
