@@ -420,6 +420,23 @@ mark.hit { background: color-mix(in srgb, var(--accent) 30%, transparent); color
     toast._t = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
+// ---- Mobile Hardware / Gesture Back Button Handler ----
+  (function initMobileNavigation() {
+    // Push an initial state entry so pressing back triggers 'popstate' instead of exiting
+    history.pushState({ page: 'report' }, '', window.location.href);
+
+    window.addEventListener('popstate', function (event) {
+      // If currently on the PHP tab, step back to the SAR tab first
+      if (activeCurrency === 'PHP') {
+        switchTab('SAR');
+        history.pushState({ page: 'report' }, '', window.location.href);
+      } else {
+        // Otherwise, navigate back to the main dashboard
+        window.location.href = 'index.html';
+      }
+    });
+  })();
+  
   // View Switcher Logic
   let activeCurrency = 'SAR';
   function switchTab(currency) {
